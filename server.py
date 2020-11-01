@@ -40,8 +40,12 @@ if __name__ == "__main__":
                     data = ast.literal_eval(raw.split(maxsplit=3)[3])
                 
                 print("Requesting {} task(s): {}".format(num, cmd[1]))
+                res = []
                 for _ in range(num): 
-                    server.execute(cmd[1], data) 
+                    res.append(server.execute(cmd[1], data)) 
+                for r in res: 
+                    r.result() 
+                print("Done!") 
             elif cmd[0] == 'share': 
                 data = ast.literal_eval(raw.split(maxsplit=1)[1])
                 print("Sharing data: {}".format(data))

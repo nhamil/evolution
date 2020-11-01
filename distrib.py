@@ -72,8 +72,8 @@ class DistributedFuture:
         waited = 0
         while timeout is None or waited <= timeout: 
             if waited > 0: 
-                time.sleep(0.1) 
-                waited += 0.1 
+                time.sleep(0.01) 
+                waited += 0.01 
             with self._lock: 
                 if self._done: 
                     return self._result 
@@ -241,6 +241,7 @@ class DistributedServer:
             random.shuffle(workers) 
             while self._task_queue.qsize() > 0: 
                 worker = None 
+                random.shuffle(workers) 
                 for w in workers: 
                     if w.can_take_task: 
                         worker = w 
@@ -385,7 +386,7 @@ class DistributedServerWorkerThread(threading.Thread):
             sock.close() 
         elif msg == MSG_CLIENT_RESULT: 
             try: 
-                print("Worker result: {}".format(data)) 
+                # print("Worker result: {}".format(data)) 
                 future = None 
                 with self.lock: 
                     if data['id'] in self._tasks: 
@@ -403,7 +404,6 @@ class DistributedServerWorkerThread(threading.Thread):
             print("Unknown message {}: {}".format(msg, data)) 
 
 def _init(): 
-    print("_init")
     pass 
 
 class DistributedWorker: 
