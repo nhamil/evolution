@@ -444,12 +444,14 @@ class DistributedWorker:
         with self.lock: 
             self._running = False 
 
-        self.worker.join() 
-        self.worker = None 
+        print("Stopping worker") 
 
         self.pool.close() 
         self.pool.terminate() 
         self.pool.join() 
+
+        self.worker.join() 
+        self.worker = None 
 
     def _worker_thread(self): 
         pool = None
@@ -465,6 +467,7 @@ class DistributedWorker:
 
                 try: 
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+                    sock.settimeout(1) 
                     try: 
                         sock.connect((self.host, self.port)) 
                         print("Connected!")
