@@ -307,8 +307,8 @@ class DistributedServerWorkerThread(threading.Thread):
                 self._tasks[future.id] = (future, data)
                 try: 
                     comm.send_socket_message(self.sock, MSG_SERVER_TASK, data) 
-                except: 
-                    print("Failed to send task to worker: {}".format(future.id))
+                except Exception as e: 
+                    print("Failed to send task to worker: {} ({})".format(future.id, e))
             else: 
                 raise Exception("Cannot take task") 
 
