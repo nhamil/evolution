@@ -455,80 +455,87 @@ class DistributedWorker:
         pool = None
         wait = False 
         while self.is_running: 
-            if wait: 
-                time.sleep(1) 
-            else: 
-                print("Connecting to {}:{}".format(self.host, self.port)) 
-
-            wait = True 
-
             try: 
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+                if wait: 
+                    time.sleep(1) 
+                else: 
+                    print("Connecting to {}:{}".format(self.host, self.port)) 
+
+                wait = True 
+
                 try: 
-                    sock.connect((self.host, self.port)) 
-                    print("Connected!")
-                except: 
-                    # print("Could not connect to server")
-                    sock.close() 
-                    sock = None 
-                    continue  
-
-                pool = self.pool
-
-                mem = psutil.virtual_memory() 
-                starting_mem = mem.available / 1024 / 1024 / 1024
-
-                sock.settimeout(0.1) 
-                comm.send_socket_message(sock, MSG_CLIENT_CONNECT, {
-                    "version": VERSION, 
-                    "n_threads": self.n_threads, 
-                    "memory": starting_mem 
-                }) 
-
-                while self.is_running: 
-                    if sock.fileno() == -1: 
-                        break 
-
-                    finished = [] 
-                    for id in self.tasks: 
-                        task = self.tasks[id] 
-                        if task.ready(): 
-                            comm.send_socket_message(sock, MSG_CLIENT_RESULT, {"id": id, "result": task.get()}) 
-                            finished.append(id) 
-                    for id in finished: 
-                        del self.tasks[id] 
-
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
                     try: 
-                        msg, data = comm.recv_socket_message(sock) 
-                        if msg is None: 
-                            print("Error occured while receiving message") 
+                        sock.connect((self.host, self.port)) 
+                        print("Connected!")
+                    except: 
+                        # print("Could not connect to server")
+                        sock.close() 
+                        sock = None 
+                        continue  
+
+                    pool = self.pool
+
+                    mem = psutil.virtual_memory() 
+                    starting_mem = mem.available / 1024 / 1024 / 1024
+
+                    sock.settimeout(0.1) 
+                    comm.send_socket_message(sock, MSG_CLIENT_CONNECT, {
+                        "version": VERSION, 
+                        "n_threads": self.n_threads, 
+                        "memory": starting_mem 
+                    }) 
+
+                    while self.is_running: 
+                        if sock.fileno() == -1: 
                             break 
-                        else: 
-                            if self._recv_message(sock, pool, msg, data): 
+
+                        finished = [] 
+                        for id in self.tasks: 
+                            task = self.tasks[id] 
+                            if task.ready(): 
+                                comm.send_socket_message(sock, MSG_CLIENT_RESULT, {"id": id, "result": task.get()}) 
+                                finished.append(id) 
+                        for id in finished: 
+                            del self.tasks[id] 
+
+                        try: 
+                            msg, data = comm.recv_socket_message(sock) 
+                            if msg is None: 
+                                print("Error occured while receiving message") 
                                 break 
-                    except socket.timeout: 
-                        pass 
+                            else: 
+                                if self._recv_message(sock, pool, msg, data): 
+                                    break 
+                        except socket.timeout: 
+                            pass 
 
+                except Exception as e: 
+                    print("Exception occurred with server communication: {}".format(e)) 
+
+                finally: 
+                    # if pool is not None: 
+                    #     pool.close() 
+                    #     pool.terminate() 
+                    #     self.pool = mp.Pool(self.n_threads) 
+                    if sock is not None: 
+                        if sock.fileno() > -1: 
+                            comm.send_socket_message(sock, MSG_CLIENT_DISCONNECT) 
+
+                        if self.is_running: 
+                            print("Disconnected from server, attempting to reconnect") 
+                        else: 
+                            print("Disconnected from server") 
+                        sock.close()
+                        sock = None 
+                        self.tasks = {} 
+                        self.shared = {} 
+            except KeyboardInterrupt: 
+                print("Keyboard interrupt: exitting") 
+                with self.lock: 
+                    self._running = False 
             except Exception as e: 
-                print("Exception occurred with server communication: {}".format(e)) 
-
-            finally: 
-                # if pool is not None: 
-                    # pool.close() 
-                    # pool.terminate() 
-                    # pool = None
-                if sock is not None: 
-                    if sock.fileno() > -1: 
-                        comm.send_socket_message(sock, MSG_CLIENT_DISCONNECT) 
-
-                    if self.is_running: 
-                        print("Disconnected from server, attempting to reconnect") 
-                    else: 
-                        print("Disconnected from server") 
-                    sock.close()
-                    sock = None 
-                    self.tasks = {} 
-                    self.shared = {} 
+                print("Exception occurred ({}), restarting".format(e))
         
         print("Worker service has been shut down, type `exit` to quit application") 
 

@@ -2,6 +2,8 @@
 # os.environ['OPENBLAS_NUM_THREADS'] = '1' 
 # os.environ['MKL_NUM_THREADS'] = '1' 
 
+import time 
+
 import numpy as np 
 
 import distrib 
@@ -18,15 +20,17 @@ def es():
     
     try: 
         srv.start() 
-        POP_SIZE = 1000 
-        SELECT_SIZE = 10 
+        time.sleep(5)
+
+        POP_SIZE = 300 
+        SELECT_SIZE = 5 
         MAX_GENERATION = 30
         LEARNING_RATE = 1 
 
         fit_fn = "fitness_pi" 
 
         x0 = [0.0, 0.0] 
-        std0 = 1
+        std0 = 10
 
         x = np.array(x0) 
         std = np.full_like(x0, std0) 
