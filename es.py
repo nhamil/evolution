@@ -7,13 +7,37 @@ import time
 import numpy as np 
 
 import distrib 
+import nn 
 
 def fitness_pi(data={}, shared={}): 
     x = data['x']
     out = np.array(np.square(np.pi - x[0]) + np.square(1.414 - x[1])) 
     return out 
 
+def fitness_xor(data={}, shared={}): 
+    model = data['model'] 
+    model = nn.dict_to_network(model) 
+
+    out = model.predict(np.array([
+        [0, 0], 
+        [0, 1], 
+        [1, 0], 
+        [1, 1]
+    ])).reshape((4,))
+
+    if 'print' in data and data['print']: 
+        for y in out: 
+            print("{:0.3f}".format(y))
+
+    out[0] = 1 - out[0] 
+    out[3] = 1 - out[3] 
+
+    out = np.power(out, 0.5) 
+
+    return np.array(4 - np.sum(out)) 
+
 distrib.register_task("fitness_pi", fitness_pi) 
+distrib.register_task("fitness_xor", fitness_xor) 
 
 def es(fit_fn, x0, std0=1, n_pop=100, n_select=5, n_gen=30, lr=1): 
     srv = distrib.DistributedServer() 
@@ -39,7 +63,7 @@ def es(fit_fn, x0, std0=1, n_pop=100, n_select=5, n_gen=30, lr=1):
             inds_f = np.argsort(fitnesses)
             parents = pop[inds_f[:n_select]]
 
-            print("Generation {}/{}: best - {:0.3e}, best weights - {}".format(gen + 1, n_gen, fitnesses[inds_f[0]], parents[0]), end='') 
+            print("Generation {}/{}: best - {:0.3e}".format(gen + 1, n_gen, fitnesses[inds_f[0]]), end='') 
 
             x_prime = np.copy(x)
             x += lr * np.mean(parents - x_prime, axis=0)
@@ -51,6 +75,38 @@ def es(fit_fn, x0, std0=1, n_pop=100, n_select=5, n_gen=30, lr=1):
     finally: 
         srv.stop() 
         # pass
+
+class EvolutionStrategy: 
+
+    def __init__(self, x0, sigma0, n_pop, n_select): 
+        self.x = np.array(x0, dtype=np.float) 
+        self.sigma = np.full_like(x0, sigma0, dtype=np.float)  
+        self.n_pop = n_pop 
+        self.n_select = n_select 
+        self.waiting = False 
+        self.gen = 0 
+
+    def ask(self): 
+        if self.waiting: 
+            raise Exception("A population has already been asked for") 
+
+        self.waiting = True 
+        self._pop = np.random.randn(self.n_pop, *self.x.shape) * self.sigma + self.x
+        self.gen += 1
+        return self._pop 
+
+    def tell(self, scores): 
+        if not self.waiting: 
+            raise Exception("A population must be asked for") 
+
+        self.waiting = False 
+        inds_f = np.argsort(scores)
+        parents = self._pop[inds_f[:self.n_select]]
+
+        print("Generation {}: best - {:0.3e}".format(self.gen, scores[inds_f[0]])) 
+
+        self.sigma = np.sqrt(np.mean(np.square(parents - self.x), axis=0)) + 1e-9
+        self.x += np.mean(parents - self.x, axis=0)
 
 # def cmaes(fit_fn, mu0, sigma0=1.0, n_pop=100, n_select=5, n_gen=30, lr=1): 
 #     alpha_mu = lr 
@@ -86,4 +142,36 @@ def es(fit_fn, x0, std0=1, n_pop=100, n_select=5, n_gen=30, lr=1):
 #         print("Generation {}/{}: best - {:0.3e}, best weights - {}, sigma - {}".format(gen + 1, n_gen, fitnesses[inds_f[0]], sel[0], sigma.flatten())) 
 
 if __name__ == "__main__": 
-    es("fitness_pi", np.full((2,), 0), 10.0, n_gen=500, n_pop=10000, n_select=1) 
+    # es("fitness_pi", np.full((2,), 0), 10.0, n_gen=50, n_pop=100, n_select=1) 
+
+    base = nn.ModelBuilder(2) 
+    base.dense(3) 
+    base.dense(1) 
+    base = base.build() 
+
+    w = base.get_weights() 
+
+    es = EvolutionStrategy(w[0], 1.0, 1000, 5) 
+
+    srv = distrib.DistributedServer() 
+    try: 
+        srv.start() 
+        time.sleep(5) 
+
+        for i in range(50): 
+            pop = es.ask() 
+
+            scores = [] 
+            for x in pop: 
+                scores.append(srv.execute('fitness_xor', {'model': nn.network_to_dict(base, (x, w[1]))})) 
+
+            scores = [s.result() for s in scores] 
+            es.tell(scores) 
+
+            if sorted(scores)[0] < 0.1: 
+                break; 
+
+        fitness_xor({'model': nn.network_to_dict(base, (es.x, w[1])), 'print': True})
+    
+    finally: 
+        srv.stop()

@@ -1,6 +1,8 @@
 from io import BytesIO 
+import collections 
 import socket 
 import struct 
+
 import numpy as np 
 
 TYPES = {} 
@@ -114,11 +116,45 @@ def decode_dict(i):
         out[key] = value 
     return out 
 
+def encode_tuple(x, o): 
+    o.write(struct.pack("<I", len(x))) 
+    for elem in x: 
+        encode_buf(elem, o) 
+
+def decode_tuple(i): 
+    length = struct.unpack("<I", i.read(4))[0]
+    out = [] 
+    for _ in range(length): 
+        out.append(decode_buf(i)) 
+    return out 
+
 def encode_ndarray(x: np.ndarray, o): 
     np.save(o, x)
 
 def decode_ndarray(i): 
     return np.load(i) 
+
+def register_class(cls): 
+    print("Registering {}".format(cls))
+
+    def encode_class(x, o): 
+        out = {} 
+        for a in dir(x): 
+            v = getattr(x, a) 
+            if not a.startswith("__") and not isinstance(v, collections.Callable): 
+                out[a] = v
+        print("Encoding {}".format(out))
+        encode_dict(out, o) 
+
+    def decode_class(i): 
+        out = decode_dict(i) 
+        print("Decoding {}".format(out))
+        c = cls.__new__(cls, None, None) 
+        for key in out: 
+            setattr(c, key, out[key]) 
+        return c 
+
+    register_type(cls, encode_class, decode_class)
 
 register_type(type(None), encode_NoneType, decode_NoneType)
 register_type(str, encode_str, decode_str)
@@ -126,4 +162,5 @@ register_type(int, encode_int, decode_int)
 register_type(float, encode_float, decode_float)
 register_type(list, encode_list, decode_list)
 register_type(dict, encode_dict, decode_dict) 
+register_type(tuple, encode_tuple, decode_tuple)
 register_type(np.ndarray, encode_ndarray, decode_ndarray) 

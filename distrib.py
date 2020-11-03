@@ -23,7 +23,7 @@ MSG_CLIENT_SEND_INFO = 0x08
 MSG_SERVER_KICK = 0x09 
 MSG_SERVER_SHARE = 0x0A 
 
-VERSION = 11
+VERSION = 12
 
 TASKS = {}
 
@@ -86,7 +86,7 @@ class DistributedFuture:
 
 class DistributedServer: 
 
-    def __init__(self, port: int=4919, n_threads: int=0): 
+    def __init__(self, port: int=4919): 
         self.port = port 
         self.lock = threading.Lock() 
         self._running = False 
@@ -556,7 +556,7 @@ class DistributedWorker:
         elif msg == MSG_SERVER_MESSAGE: 
             print("Message from server: {}".format(data)) 
         elif msg == MSG_SERVER_TASK: 
-            print("Task from server: {}".format(data))
+            print("Task from server: {} (id={})".format(data['task'], data['id']))
             try: 
                 task = get_task(data['task']) 
                 self.tasks[data['id']] = pool.apply_async(task, (data['args'], self.shared))
