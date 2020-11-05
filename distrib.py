@@ -6,6 +6,7 @@ import socket
 import sys 
 import threading 
 import time 
+import traceback
 import queue 
 
 import psutil 
@@ -23,7 +24,7 @@ MSG_CLIENT_SEND_INFO = 0x08
 MSG_SERVER_KICK = 0x09 
 MSG_SERVER_SHARE = 0x0A 
 
-VERSION = 12
+VERSION = 13
 
 TASKS = {}
 
@@ -261,7 +262,7 @@ class DistributedServer:
                 self._workers.remove(worker) 
                 with worker.lock: 
                     for id in worker._tasks: 
-                        print("Requeueing task {}".format(id)) 
+                        # print("Requeueing task {}".format(id)) 
                         self._task_queue.put(worker._tasks[id]) 
             except: 
                 pass # worker was not found 
@@ -298,17 +299,20 @@ class DistributedServerWorkerThread(threading.Thread):
     @property
     def can_take_task(self): 
         with self.lock: 
-            return self._n_threads > self._n_tasks 
+            return self._n_threads * 3 > self._n_tasks 
 
     def add_task(self, future, data): 
         with self.lock: 
-            if self._n_threads > self._n_tasks: 
+            if self._n_threads * 3 > self._n_tasks: 
                 self._n_tasks += 1 
                 self._tasks[future.id] = (future, data)
                 try: 
                     comm.send_socket_message(self.sock, MSG_SERVER_TASK, data) 
-                except Exception as e: 
-                    print("Failed to send task to worker: {} ({})".format(future.id, e))
+                except: 
+                    # print("Failed to send task to worker: {} ({})".format(future.id, e))
+                    # print("Requeueing task {}".format(future.id)) 
+                    self.server._task_queue.put((future, data)) 
+                    del self._tasks[future.id] 
             else: 
                 raise Exception("Cannot take task") 
 
@@ -515,6 +519,7 @@ class DistributedWorker:
 
                 except Exception as e: 
                     print("Exception occurred with server communication: {}".format(e)) 
+                    traceback.print_exc() 
 
                 finally: 
                     # if pool is not None: 

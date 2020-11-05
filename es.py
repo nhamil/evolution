@@ -38,6 +38,17 @@ def fitness_xor(data={}, shared={}):
     return np.array(4 - np.sum(out)) 
 
 def fitness_connect4(data={}, shared={}): 
+    total = 0 
+    try: 
+        for y in range(len(shared['models'])): 
+            if data['x'] != y: 
+                data['y'] = y 
+                total += fitness_connect4_ind(data, shared) 
+    except Exception as e: 
+        print("Exception in fitness_connect4: {}".format(e))
+    return np.array(total) 
+
+def fitness_connect4_ind(data={}, shared={}): 
     model_a = shared['models'][data['x']]
     model_a = nn.dict_to_network(model_a) 
 
@@ -72,7 +83,7 @@ def fitness_connect4(data={}, shared={}):
                 return 1 
 
     if p: print("{} won the game".format('X' if nets[env.get_winner()] == model_a else 'Y'))
-    return 1 if nets[env.get_winner()] == model_a else 0 
+    return 1 if nets[env.get_winner()] == model_a else 0
 
 
 distrib.register_task("fitness_pi", fitness_pi) 
@@ -140,7 +151,7 @@ class EvolutionStrategy:
             raise Exception("A population must be asked for") 
 
         self.waiting = False 
-        inds_f = np.argsort(scores)
+        inds_f = np.argsort(scores)[::-1]
         parents = self._pop[inds_f[:self.n_select]]
 
         print("Generation {}: best - {:0.3e}".format(self.gen, scores[inds_f[0]])) 
@@ -188,13 +199,14 @@ if __name__ == "__main__":
     CON4_HEIGHT = 6 
 
     base = nn.ModelBuilder(CON4_WIDTH * CON4_HEIGHT) 
-    base.dense(100) 
+    base.dense(10) 
+    base.dense(10) 
     base.dense(CON4_WIDTH) 
     base = base.build() 
 
     w = base.get_weights() 
 
-    es = EvolutionStrategy(w[0], 1.0, 50, 5) 
+    es = EvolutionStrategy(w[0], 1.0, 300, 20) 
 
     srv = distrib.DistributedServer() 
     try: 
@@ -204,7 +216,7 @@ if __name__ == "__main__":
         shared = {} 
         scores = [] 
 
-        for i in range(10): 
+        for i in range(4): 
             pop = es.ask() 
 
             shared = { 
@@ -212,28 +224,25 @@ if __name__ == "__main__":
                 'size': (CON4_WIDTH, CON4_HEIGHT) 
             }
             srv.share(shared) 
+            # time.sleep(5) 
 
             scores = [] 
             for x in range(len(pop)): 
                 # scores.append(srv.execute('fitness_xor', {'model': nn.network_to_dict(base, (x, w[1]))})) 
-                s = [] 
-                for y in range(len(pop)): 
-                    if x != y: 
-                        s.append(srv.execute('fitness_connect4', {'x': x, 'y': y}))
-                scores.append(s) 
+                scores.append(srv.execute('fitness_connect4', {'x': x}))
 
-            scores = [-np.sum([s.result() for s in lst]) for lst in scores] 
+            scores = [s.result() for s in scores] 
             # scores = [s.result() for s in scores] 
             es.tell(scores) 
 
             # if sorted(scores)[0] < 0.1: 
             #     break 
 
-        best = np.argsort(scores)
+        best = np.argsort(scores)[::-1]
         print("Best 2 players: {} ({}), {} ({})".format(best[0], scores[best[0]], best[1], scores[best[1]]))
 
         # fitness_xor({'model': nn.network_to_dict(base, (es.x, w[1])), 'print': True})
-        fitness_connect4(data={'x': best[0], 'y': best[1], 'print': True}, shared=shared)
+        fitness_connect4_ind(data={'x': best[0], 'y': best[1], 'print': True}, shared=shared)
     
     finally: 
         srv.stop()
