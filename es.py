@@ -46,6 +46,8 @@ def fitness_connect4(data={}, shared={}):
                 total += fitness_connect4_ind(data, shared) 
     except Exception as e: 
         print("Exception in fitness_connect4: {}".format(e))
+        import traceback 
+        traceback.print_exc() 
     return np.array(total) 
 
 def fitness_connect4_ind(data={}, shared={}): 
@@ -87,8 +89,17 @@ def fitness_connect4_ind(data={}, shared={}):
             else: 
                 return 1 
 
-    if p: print("{} won the game".format('X' if nets[env.get_winner()] == model_a else 'Y'))
-    return 1 if nets[env.get_winner()] == model_a else 0
+    win = env.get_winner()
+    if win == 0: 
+        if p: print("X and Y tied")
+        return 0 
+    elif nets[win] == model_a: 
+        if p: print("X won the game")
+        return 1 
+    else: 
+        if p: print("Y won the game")
+        return -1 
+        
 
 
 distrib.register_task("fitness_pi", fitness_pi) 
