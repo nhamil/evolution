@@ -24,7 +24,7 @@ MSG_CLIENT_SEND_INFO = 0x08
 MSG_SERVER_KICK = 0x09 
 MSG_SERVER_SHARE = 0x0A 
 
-VERSION = 15
+VERSION = 16
 
 TASKS = {}
 
@@ -568,7 +568,7 @@ class DistributedWorker:
             except Exception as e: 
                 print(e) 
         elif msg == MSG_SERVER_SHARE: 
-            print("Shared data from server: {}".format(data)) 
+            print("New shared data from server") 
             self.shared = data 
         else: 
             print("Unknown message {}: {}".format(msg, data)) 

@@ -39,16 +39,20 @@ def fitness_xor(data={}, shared={}):
 
 def fitness_connect4(data={}, shared={}): 
     total = 0 
+    num = 0
+    y_list = np.arange(len(shared['models']))
+    np.random.shuffle(y_list)
     try: 
-        for y in range(len(shared['models'])): 
+        for y in y_list[:min(20, len(y_list))]: 
             if data['x'] != y: 
                 data['y'] = y 
                 total += fitness_connect4_ind(data, shared) 
+                num += 1
     except Exception as e: 
         print("Exception in fitness_connect4: {}".format(e))
         import traceback 
         traceback.print_exc() 
-    return np.array(total) 
+    return np.array(total / num) 
 
 def fitness_connect4_ind(data={}, shared={}): 
     model_a = shared['models'][data['x']]
@@ -89,7 +93,7 @@ def fitness_connect4_ind(data={}, shared={}):
             # print("Error while making move: {}".format(e))
             if p: print("{} won the game due to bad move by opponent".format('Y' if nets[player] == model_a else 'X'))
             if nets[player] == model_a: 
-                return 0 
+                return -1 
             else: 
                 return 1 
 
@@ -137,12 +141,9 @@ class EvolutionStrategy:
         inds_f = np.argsort(scores)[::-1]
         parents = self._pop[inds_f[:self.n_select]]
 
-        print("Generation {}: best - {:0.3e}".format(self.gen, scores[inds_f[0]])) 
+        print("Generation {}: best - {:0.6f}, elite - {:0.6f}, avg - {:0.6f}, worst - {:0.6f}".format(self.gen, scores[inds_f[0]], np.mean([scores[i] for i in inds_f[:self.n_select]]), np.mean(scores), scores[inds_f[-1]])) 
 
         self.sigma[:] = np.sqrt(np.mean(np.square(parents - self.x), axis=0)) + 1e-9
-
-        print(self.sigma) 
-
         self.x += np.mean(parents - self.x, axis=0)
 
 if __name__ == "__main__": 
@@ -150,12 +151,13 @@ if __name__ == "__main__":
     CON4_HEIGHT = 6 
 
     base = nn.ModelBuilder(CON4_WIDTH * CON4_HEIGHT) 
-    base.dense(1) 
+    base.dense(CON4_WIDTH * CON4_HEIGHT) 
+    base.dense(1)
     base = base.build() 
 
     w = base.get_weights() 
 
-    es = EvolutionStrategy(w[0], 100.0, 200, 10) 
+    es = EvolutionStrategy(w[0], 1.0, 200, 3) 
 
     srv = distrib.DistributedServer() 
     try: 
@@ -165,7 +167,7 @@ if __name__ == "__main__":
         shared = {} 
         scores = [] 
 
-        for i in range(10): 
+        for i in range(100): 
             pop = es.ask() 
 
             shared = { 
