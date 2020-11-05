@@ -57,7 +57,11 @@ def fitness_connect4_ind(data={}, shared={}):
     model_b = shared['models'][data['y']]
     model_b = nn.dict_to_network(model_b) 
 
-    nets = { 1: model_a, -1: model_b }
+    nets = None 
+    if np.random.randint(0, 2) > 0: 
+        nets = { 1: model_a, -1: model_b }
+    else: 
+        nets = { -1: model_a, 1: model_b }
     w, h = shared['size'] 
 
     env = Connect4(w, h) 
@@ -136,6 +140,9 @@ class EvolutionStrategy:
         print("Generation {}: best - {:0.3e}".format(self.gen, scores[inds_f[0]])) 
 
         self.sigma[:] = np.sqrt(np.mean(np.square(parents - self.x), axis=0)) + 1e-9
+
+        print(self.sigma) 
+
         self.x += np.mean(parents - self.x, axis=0)
 
 if __name__ == "__main__": 
@@ -148,7 +155,7 @@ if __name__ == "__main__":
 
     w = base.get_weights() 
 
-    es = EvolutionStrategy(w[0], 10.0, 200, 10) 
+    es = EvolutionStrategy(w[0], 100.0, 200, 10) 
 
     srv = distrib.DistributedServer() 
     try: 
@@ -158,7 +165,7 @@ if __name__ == "__main__":
         shared = {} 
         scores = [] 
 
-        for i in range(4): 
+        for i in range(10): 
             pop = es.ask() 
 
             shared = { 
