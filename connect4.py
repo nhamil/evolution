@@ -23,13 +23,18 @@ class Connect4:
                 actions.append(i) 
         return actions 
 
-    def step(self, action): 
-        if self.board[0, action] == 0: 
+    def step(self, action, board=None): 
+        real = False 
+        if board is None: 
+            board = self.board 
+            real = True 
+
+        if board[0, action] == 0: 
             for i in range(self.height-1, -1, -1): 
-                if self.board[i, action] == 0: 
-                    self.board[i, action] = self.turn 
-                    self.turn *= -1 
-                    return 
+                if board[i, action] == 0: 
+                    board[i, action] = self.turn 
+                    if real: self.turn *= -1 
+                    return board 
         else: 
             raise Exception("Cannot take action {}: move is illegal".format(action)) 
 
@@ -69,7 +74,10 @@ class Connect4:
                 if np.abs(val) == 4: 
                     return int(np.sign(val)) 
 
-        return 0 
+        if 0 not in board: 
+            return 0
+        else: 
+            return None  
 
     def render(self): 
         s = '+' + '-'*(self.width*2-1) + '+\n'  

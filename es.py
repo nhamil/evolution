@@ -64,15 +64,20 @@ def fitness_connect4_ind(data={}, shared={}):
     if 'print' in data and data['print']: 
         p = True 
 
-    while env.get_winner() == 0: 
+    while env.get_winner() is None: 
         state = env.get_state() 
-
+        actions = env.get_actions() 
         player = env.get_player() 
 
-        values = nets[player].predict(state.flatten()) 
+        states = np.repeat(state[np.newaxis, :,:], len(actions), axis=0)
+        for i in range(len(actions)): 
+            env.step(actions[i], states[i])
+        states = np.reshape(states, (len(actions), -1)) 
+
+        values = np.reshape(nets[player].predict(states), (len(actions),)) 
 
         try: 
-            env.step(int(np.argmax(values))) 
+            env.step(actions[np.argmax(values)]) 
             if p: env.render() 
         except: 
             # print("Error while making move: {}".format(e))
@@ -89,43 +94,6 @@ def fitness_connect4_ind(data={}, shared={}):
 distrib.register_task("fitness_pi", fitness_pi) 
 distrib.register_task("fitness_xor", fitness_xor) 
 distrib.register_task("fitness_connect4", fitness_connect4) 
-
-def es(fit_fn, x0, std0=1, n_pop=100, n_select=5, n_gen=30, lr=1): 
-    srv = distrib.DistributedServer() 
-    
-    print(fit_fn, x0, std0, n_pop, n_select, n_gen, lr)
-
-    try: 
-        srv.start() 
-        time.sleep(5)
-
-        x = np.array(x0) 
-        std = np.full_like(x0, std0) 
-
-        for gen in range(n_gen): 
-            pop = np.random.randn(n_pop, *x.shape) * std + x
-
-            fit = []
-            for x in pop: 
-                fit.append(srv.execute(fit_fn, { 'x': x }))
-                # fit.append(fit_fn({ 'x': x }))
-            fitnesses = np.array([f.result() for f in fit])
-            # fitnesses = np.array(fit)
-            inds_f = np.argsort(fitnesses)
-            parents = pop[inds_f[:n_select]]
-
-            print("Generation {}/{}: best - {:0.3e}".format(gen + 1, n_gen, fitnesses[inds_f[0]]), end='') 
-
-            x_prime = np.copy(x)
-            x += lr * np.mean(parents - x_prime, axis=0)
-            std = np.sqrt(np.mean(np.square(parents - x_prime), axis=0)) + 1e-9
-
-            print(std) 
-
-            time.sleep(0.1) 
-    finally: 
-        srv.stop() 
-        # pass
 
 class EvolutionStrategy: 
 
@@ -156,57 +124,20 @@ class EvolutionStrategy:
 
         print("Generation {}: best - {:0.3e}".format(self.gen, scores[inds_f[0]])) 
 
-        self.sigma = np.sqrt(np.mean(np.square(parents - self.x), axis=0)) + 1e-9
+        self.sigma[:] = np.sqrt(np.mean(np.square(parents - self.x), axis=0)) + 1e-9
         self.x += np.mean(parents - self.x, axis=0)
 
-# def cmaes(fit_fn, mu0, sigma0=1.0, n_pop=100, n_select=5, n_gen=30, lr=1): 
-#     alpha_mu = lr 
-
-#     mu = np.array(mu0, dtype=np.float) 
-#     sigma = np.diag(np.full_like(mu.flatten(), sigma0, dtype=np.float))
-
-#     print(mu.shape, sigma.shape)
-
-#     for gen in range(n_gen): 
-#         pop = np.reshape(np.random.multivariate_normal(mu.flatten(), sigma, size=n_pop), (n_pop, *mu.shape)) 
-#     #     pop = np.random.randn(n_pop, *mu.shape) * sigma + mu 
-
-#         fit = []
-#         for x in pop: 
-#             fit.append(fit_fn({ 'x': x }))
-#         fitnesses = np.array([f for f in fit])
-#         inds_f = np.argsort(fitnesses)
-#         sel = pop[inds_f[:n_select]]
-
-#         mu_prime = mu
-#         mu = mu_prime + alpha_mu * np.mean(sel - mu_prime, axis=0) 
-
-#         sel_2d = np.reshape(sel, (n_select, -1)) 
-#         mu_1d = mu_prime.flatten()
-#         # sel_2d += -np.mean(sel_2d, axis=0) + mu_1d
-#         sel_2d -= mu_1d
-#         # print(np.mean(sel_2d - np.mean(sel_2d, axis=0) + mu_1d, axis=0))
-#         # print(mu_1d) 
-#         sigma = np.cov(sel_2d.T)
-#         # print(sigma) 
-
-#         print("Generation {}/{}: best - {:0.3e}, best weights - {}, sigma - {}".format(gen + 1, n_gen, fitnesses[inds_f[0]], sel[0], sigma.flatten())) 
-
 if __name__ == "__main__": 
-    # es("fitness_pi", np.full((2,), 0), 10.0, n_gen=50, n_pop=100, n_select=1) 
-
     CON4_WIDTH = 7 
     CON4_HEIGHT = 6 
 
     base = nn.ModelBuilder(CON4_WIDTH * CON4_HEIGHT) 
-    base.dense(10) 
-    base.dense(10) 
-    base.dense(CON4_WIDTH) 
+    base.dense(1) 
     base = base.build() 
 
     w = base.get_weights() 
 
-    es = EvolutionStrategy(w[0], 1.0, 300, 20) 
+    es = EvolutionStrategy(w[0], 10.0, 200, 10) 
 
     srv = distrib.DistributedServer() 
     try: 
