@@ -2,9 +2,6 @@ import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-import tensorflow as tf   
-tf.logging.set_verbosity(tf.logging.ERROR)
-
 import keras 
 from keras.models import Model, Sequential
 from keras.layers import Conv2D, Dense, Flatten, InputLayer 
