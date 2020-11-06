@@ -38,15 +38,17 @@ def unvectorize_weights(data):
 
 def encode_model(model: Model, weights=True): 
     if weights: 
-        return { 'config': model.get_config(), 'weights': model.get_weights() }
+        return { 'input': model.input_shape, 'config': model.get_config(), 'weights': model.get_weights() }
     else: 
-        return { 'config': model.get_config() } 
+        return { 'input': model.input_shape, 'config': model.get_config() } 
 
-def decode_model(data): 
-    model = Sequential.from_config(data['config']['config'])
-    model.build() 
+def decode_model(data, weights=None): 
+    model = Sequential.from_config(data['config'])
+    model.build(data['input']) 
 
-    if 'weights' in data: 
+    if weights is not None: 
+        model.set_weights(weights)
+    elif 'weights' in data: 
         model.set_weights(data['weights'])
 
     return model 

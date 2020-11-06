@@ -16,27 +16,27 @@ def fitness_pi(data={}, shared={}):
     out = np.array(np.square(np.pi - x[0]) + np.square(1.414 - x[1])) 
     return out 
 
-def fitness_xor(data={}, shared={}): 
-    model = data['model'] 
-    model = nn.dict_to_network(model) 
+# def fitness_xor(data={}, shared={}): 
+#     model = data['model'] 
+#     model = nn.dict_to_network(model) 
 
-    out = model.predict(np.array([
-        [0, 0], 
-        [0, 1], 
-        [1, 0], 
-        [1, 1]
-    ])).reshape((4,))
+#     out = model.predict(np.array([
+#         [0, 0], 
+#         [0, 1], 
+#         [1, 0], 
+#         [1, 1]
+#     ])).reshape((4,))
 
-    if 'print' in data and data['print']: 
-        for y in out: 
-            print("{:0.3f}".format(y))
+#     if 'print' in data and data['print']: 
+#         for y in out: 
+#             print("{:0.3f}".format(y))
 
-    out[0] = 1 - out[0] 
-    out[3] = 1 - out[3] 
+#     out[0] = 1 - out[0] 
+#     out[3] = 1 - out[3] 
 
-    out = np.power(out, 0.5) 
+#     out = np.power(out, 0.5) 
 
-    return np.array(4 - np.sum(out)) 
+#     return np.array(4 - np.sum(out)) 
 
 def fitness_connect4(data={}, shared={}): 
     total = 0 
@@ -53,11 +53,13 @@ def fitness_connect4(data={}, shared={}):
         print("Exception in fitness_connect4: {}".format(e))
         import traceback 
         traceback.print_exc() 
+
+    print("Done with {}".format(data['x']))
     return np.array(total / num) 
 
 def fitness_connect4_ind(data={}, shared={}): 
-    model_a = nn.decode_model({ 'config': shared['config'], 'weights': nn.unvectorize_weights(shared['models'][data['x']]) }) 
-    model_b = nn.decode_model({ 'config': shared['config'], 'weights': nn.unvectorize_weights(shared['models'][data['y']]) }) 
+    model_a = nn.decode_model(shared['config'], weights=nn.unvectorize_weights(shared['models'][data['x']])) 
+    model_b = nn.decode_model(shared['config'], weights=nn.unvectorize_weights(shared['models'][data['y']])) 
 
     nets = None 
     if np.random.randint(0, 2) > 0: 
@@ -109,7 +111,7 @@ def fitness_connect4_ind(data={}, shared={}):
 
 
 distrib.register_task("fitness_pi", fitness_pi) 
-distrib.register_task("fitness_xor", fitness_xor) 
+# distrib.register_task("fitness_xor", fitness_xor) 
 distrib.register_task("fitness_connect4", fitness_connect4) 
 
 class EvolutionStrategy: 
@@ -148,13 +150,8 @@ if __name__ == "__main__":
     CON4_WIDTH = 7 
     CON4_HEIGHT = 6 
 
-    # base = nn.ModelBuilder(CON4_WIDTH * CON4_HEIGHT) 
-    # base.dense(CON4_WIDTH * CON4_HEIGHT) 
-    # base.dense(1)
-    # base = base.build() 
-
     base = nn.Sequential() 
-    base.add(nn.InputLayer(input_shape=(CON4_WIDTH, CON4_HEIGHT)))  
+    base.add(nn.InputLayer(input_shape=(CON4_WIDTH * CON4_HEIGHT,)))  
     # base.add(nn.Flatten()) 
     base.add(nn.Dense(CON4_WIDTH * CON4_HEIGHT, activation='relu')) 
     base.add(nn.Dense(1, activation='sigmoid'))

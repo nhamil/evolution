@@ -579,9 +579,6 @@ class DistributedWorker:
                 print(e) 
         elif msg == MSG_SERVER_SHARE: 
             print("New shared data from server") 
-            for key in data: 
-                print(key, data[key]) 
-            print("Done") 
             self.shared = data 
         else: 
             print("Unknown message {}: {}".format(msg, data)) 
