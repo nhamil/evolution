@@ -159,7 +159,7 @@ if __name__ == "__main__":
     w = nn.vectorize_weights(base.get_weights()) 
     cfg = nn.encode_model(base, weights=False) 
 
-    es = EvolutionStrategy(w[0], 1.0, 20, 2) 
+    es = EvolutionStrategy(w[0], 1.0, 200, 10) 
 
     srv = distrib.DistributedServer() 
     try: 
