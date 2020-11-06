@@ -44,6 +44,7 @@ def encode_model(model: Model, weights=True):
 
 def decode_model(data): 
     model = Sequential.from_config(data['config']['config'])
+    model.build() 
 
     if 'weights' in data: 
         model.set_weights(data['weights'])
