@@ -128,6 +128,12 @@ def decode_tuple(i):
         out.append(decode_buf(i)) 
     return out 
 
+def encode_bool(x, o): 
+    o.write(struct.pack("<?", x))
+
+def decode_bool(i): 
+    return struct.unpack("<?", i.read(1)) 
+
 def encode_ndarray(x: np.ndarray, o): 
     np.save(o, x)
 
@@ -163,4 +169,6 @@ register_type(float, encode_float, decode_float)
 register_type(list, encode_list, decode_list)
 register_type(dict, encode_dict, decode_dict) 
 register_type(tuple, encode_tuple, decode_tuple)
+register_type(bool, encode_bool, decode_bool) 
 register_type(np.ndarray, encode_ndarray, decode_ndarray) 
+register_type(np.float32, encode_ndarray, decode_ndarray) 

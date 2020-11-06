@@ -24,7 +24,7 @@ MSG_CLIENT_SEND_INFO = 0x08
 MSG_SERVER_KICK = 0x09 
 MSG_SERVER_SHARE = 0x0A 
 
-VERSION = 16
+VERSION = 17
 
 TASKS = {}
 
@@ -236,22 +236,31 @@ class DistributedServer:
             except: 
                 print("Error while waiting for client") 
 
-            workers = None
+            workers = []
             with self.lock: 
-                workers = [x for x in self._workers if x.is_ready] 
+                for x in self._workers: 
+                    if x.is_ready: 
+                        for i in range(x._n_threads): 
+                            workers.append(x) 
             random.shuffle(workers) 
-            while self._task_queue.qsize() > 0: 
-                worker = None 
-                random.shuffle(workers) 
-                for w in workers: 
-                    if w.can_take_task: 
-                        worker = w 
-                        break 
-                if worker is None: 
+            for w in workers: 
+                if self._task_queue.empty(): 
                     break 
 
+                if not w.can_take_task: 
+                    continue 
+            # while self._task_queue.qsize() > 0: 
+            #     worker = None 
+            #     random.shuffle(workers) 
+            #     for w in workers: 
+            #         if w.can_take_task: 
+            #             worker = w 
+            #             break 
+            #     if worker is None: 
+            #         break 
+
                 future, send = self._task_queue.get() 
-                worker.add_task(future, send) 
+                w.add_task(future, send) 
 
         sock.close() 
         print("Stopping server at %s:%s" % ("localhost", self.port))
@@ -298,23 +307,24 @@ class DistributedServerWorkerThread(threading.Thread):
 
     @property
     def can_take_task(self): 
-        with self.lock: 
-            return self._n_threads * 3 > self._n_tasks 
+        # with self.lock: 
+        #     return self._n_threads * 3 > self._n_tasks 
+        return True
 
     def add_task(self, future, data): 
         with self.lock: 
-            if self._n_threads * 3 > self._n_tasks: 
-                self._n_tasks += 1 
-                self._tasks[future.id] = (future, data)
-                try: 
-                    comm.send_socket_message(self.sock, MSG_SERVER_TASK, data) 
-                except: 
-                    # print("Failed to send task to worker: {} ({})".format(future.id, e))
-                    # print("Requeueing task {}".format(future.id)) 
-                    self.server._task_queue.put((future, data)) 
-                    del self._tasks[future.id] 
-            else: 
-                raise Exception("Cannot take task") 
+            # if self._n_threads * 3 > self._n_tasks: 
+            self._n_tasks += 1 
+            self._tasks[future.id] = (future, data)
+            try: 
+                comm.send_socket_message(self.sock, MSG_SERVER_TASK, data) 
+            except: 
+                # print("Failed to send task to worker: {} ({})".format(future.id, e))
+                # print("Requeueing task {}".format(future.id)) 
+                self.server._task_queue.put((future, data)) 
+                del self._tasks[future.id] 
+            # else: 
+            #     raise Exception("Cannot take task") 
 
     def run(self): 
         try: 
@@ -569,6 +579,9 @@ class DistributedWorker:
                 print(e) 
         elif msg == MSG_SERVER_SHARE: 
             print("New shared data from server") 
+            for key in data: 
+                print(key, data[key]) 
+            print("Done") 
             self.shared = data 
         else: 
             print("Unknown message {}: {}".format(msg, data)) 

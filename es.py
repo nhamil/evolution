@@ -1,4 +1,4 @@
-# import os 
+import os 
 # os.environ['OPENBLAS_NUM_THREADS'] = '1' 
 # os.environ['MKL_NUM_THREADS'] = '1' 
 
@@ -7,6 +7,7 @@ import time
 import numpy as np 
 
 from connect4 import Connect4
+import comm 
 import distrib 
 import nn 
 
@@ -55,11 +56,8 @@ def fitness_connect4(data={}, shared={}):
     return np.array(total / num) 
 
 def fitness_connect4_ind(data={}, shared={}): 
-    model_a = shared['models'][data['x']]
-    model_a = nn.dict_to_network(model_a) 
-
-    model_b = shared['models'][data['y']]
-    model_b = nn.dict_to_network(model_b) 
+    model_a = nn.decode_model({ 'config': shared['config'], 'weights': nn.unvectorize_weights(shared['models'][data['x']]) }) 
+    model_b = nn.decode_model({ 'config': shared['config'], 'weights': nn.unvectorize_weights(shared['models'][data['y']]) }) 
 
     nets = None 
     if np.random.randint(0, 2) > 0: 
@@ -150,14 +148,21 @@ if __name__ == "__main__":
     CON4_WIDTH = 7 
     CON4_HEIGHT = 6 
 
-    base = nn.ModelBuilder(CON4_WIDTH * CON4_HEIGHT) 
-    base.dense(CON4_WIDTH * CON4_HEIGHT) 
-    base.dense(1)
-    base = base.build() 
+    # base = nn.ModelBuilder(CON4_WIDTH * CON4_HEIGHT) 
+    # base.dense(CON4_WIDTH * CON4_HEIGHT) 
+    # base.dense(1)
+    # base = base.build() 
 
-    w = base.get_weights() 
+    base = nn.Sequential() 
+    base.add(nn.InputLayer(input_shape=(CON4_WIDTH, CON4_HEIGHT)))  
+    # base.add(nn.Flatten()) 
+    base.add(nn.Dense(CON4_WIDTH * CON4_HEIGHT, activation='relu')) 
+    base.add(nn.Dense(1, activation='sigmoid'))
 
-    es = EvolutionStrategy(w[0], 1.0, 200, 3) 
+    w = nn.vectorize_weights(base.get_weights()) 
+    cfg = nn.encode_model(base, weights=False) 
+
+    es = EvolutionStrategy(w[0], 1.0, 20, 2) 
 
     srv = distrib.DistributedServer() 
     try: 
@@ -171,7 +176,8 @@ if __name__ == "__main__":
             pop = es.ask() 
 
             shared = { 
-                'models': [nn.network_to_dict(base, (x, w[1])) for x in pop], 
+                'config': cfg, 
+                'models': [(x, w[1]) for x in pop], 
                 'size': (CON4_WIDTH, CON4_HEIGHT) 
             }
             srv.share(shared) 
@@ -182,7 +188,9 @@ if __name__ == "__main__":
                 # scores.append(srv.execute('fitness_xor', {'model': nn.network_to_dict(base, (x, w[1]))})) 
                 scores.append(srv.execute('fitness_connect4', {'x': x}))
 
+            print("Waiting for scores...")
             scores = [s.result() for s in scores] 
+            print("Done!")
             # scores = [s.result() for s in scores] 
             es.tell(scores) 
 
