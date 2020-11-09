@@ -9,9 +9,16 @@ class Genome:
         self.conns = conns # [(innov, enabled, a, b, weight), ...]
         self.nodes.sort(key=lambda x: x[0]) # sort by id 
         self.conns.sort(key=lambda x: x[0]) # sort by innovation number 
+        self.species = None 
+        self.fitness = None 
+        self.adj_fitness = None 
 
     def __str__(self): 
-        return "Genome[{}, {}, {}, {}]".format(self.n_inputs, self.n_outputs, self.nodes, self.conns) 
+        return "Genome[{}, {}, {}, {}]".format(self.n_inputs, self.n_outputs, [(*n[:-1], float("{:0.3f}".format(n[-1]))) for n in self.nodes], [(*c[:-1], float("{:0.3f}".format(c[-1]))) for c in self.conns]) 
+
+    def add_conn(self, conn): 
+        self.conns.append(conn) 
+        self.conns.sort(key=lambda x: x[0]) # sort by innovation number 
 
     def copy(self): 
         return Genome(
@@ -74,42 +81,270 @@ class Genome:
     def max_node(self): 
         return len(self.nodes) 
 
+class Node: 
+
+    def __init__(self, id, activation, act_name, bias): 
+        self.id = id 
+        self.conns = [] 
+        self.activation = activation 
+        self.act_name = act_name
+        self.bias = bias 
+        self.output = 0 
+
+    def add_conn(self, in_node, weight): 
+        self.conns.append((in_node, weight)) 
+
+    def evaluate(self): 
+        total = self.bias 
+        for in_node, weight in self.conns: 
+            total += in_node.output * weight 
+        self.output = self.activation(total) 
+        return self.output 
+
 class Network: 
 
-    def __init__(self, genome: Genome): 
+    def __init__(self, genome: Genome, activations: dict): 
         self.genome = genome 
         self.n_inputs = genome.n_inputs
         self.n_outputs = genome.n_outputs 
-        raise NotImplementedError 
+
+        layers = {}
+        nodes = {} 
+
+        self.input_layer = [] 
+        for i in range(self.n_inputs): 
+            node = Node(i, None, None, 0)
+            self.input_layer.append(node) 
+            nodes[i] = node 
+
+        for n in genome.nodes: 
+            layer = n[1] 
+            if layer not in layers: 
+                layers[layer] = [] 
+            
+            node = Node(n[0], activations[n[2]], n[2], n[3]) 
+            nodes[n[0]] = node 
+            layers[layer].append(node) 
+
+        self.output_layer = [] 
+        for i in range(self.n_outputs): 
+            self.output_layer.append(nodes[self.n_inputs + i]) 
+
+        for c in genome.conns: 
+            enabled = c[1] 
+            if enabled: 
+                a = c[2] 
+                b = c[3] 
+                w = c[4] 
+                nodes[b].add_conn(nodes[a], w) 
+
+        keys = sorted([k for k in layers]) 
+        self.layers = [] 
+        for k in keys: 
+            self.layers.append(layers[k]) 
+
+    def __str__(self): 
+        s = 'Network[in={}, out={}, species={}, nodes=[\n'.format(self.n_inputs, self.n_outputs, self.genome.species)
+        for i in range(len(self.layers)): 
+            layer = self.layers[i]
+            for node in layer: 
+                s += '  Node[id={}, layer={}, bias={:0.3f}, act={}, conns=['.format(node.id, i+1, node.bias, node.act_name)
+                for conn in node.conns: 
+                    if conn != node.conns[0]: 
+                        s += ', '
+                    s += '({}, {:0.3f})'.format(conn[0].id, conn[1]) 
+                s += ']\n'
+        s += ']'
+        return s 
 
     def predict(self, x): 
-        raise NotImplementedError 
+        for i in range(len(self.input_layer)):       
+            node = self.input_layer[i]       
+            node.output = x[i]
+
+        for layer in self.layers: 
+            for node in layer: 
+                node.evaluate() 
+        
+        return np.array([n.output for n in self.output_layer]) 
 
 class Neat: 
 
-    def __init__(self, n_inputs, n_outputs, cfg: dict={}): 
+    def __init__(self, n_inputs: int, n_outputs: int, n_pop: int=100, cfg: dict={}): 
         if n_inputs < 1: 
             raise Exception("Number of inputs must be at least 1: {}".format(n_inputs))
         if n_outputs < 1: 
             raise Exception("Number of outputs must be at least 1: {}".format(n_outputs))
         self.n_inputs = n_inputs 
         self.n_outputs = n_outputs 
+        self.n_pop = n_pop 
         self.node = n_inputs + n_outputs - 1
         self.innov = n_inputs * n_outputs - 1
+        self.innov_map = {} 
+        self.spec = 0 
+        self.species = {} 
+        self.spec_sizes = None 
+        self.generation = 0 
+        self.elite_percent = 0.5 
+        self.pop = None 
+        self.activations = {
+            'linear': lambda x: x, 
+            'sigmoid': lambda x: 1.0 / (1.0 + np.exp(-x)) 
+        }
 
-    def next_innov(self): 
+    def _next_innov(self): 
         self.innov += 1 
         return self.innov 
+
+    def get_innov(self, a, b): 
+        key = (a, b) 
+        if key in self.innov_map: 
+            return self.innov_map[key] 
+        else: 
+            i = self._next_innov() 
+            self.innov_map[key] = i 
+            return i 
 
     def next_node(self): 
         self.node += 1 
         return self.node 
 
+    def next_species(self): 
+        self.spec += 1 
+        return self.spec 
+
     def ask(self): 
-        raise NotImplementedError
+        self.generation += 1 
+
+        if self.spec_sizes is None: 
+            self.pop = [self.create_genome() for _ in range(self.n_pop)] 
+        else: 
+            self.pop = [] 
+            for s in self.spec_sizes: 
+                sz = self.spec_sizes[s] 
+                spec = self.species[s] 
+                spec.sort(key=lambda x: -x.fitness)
+                elite = spec[:max(1, int(self.elite_percent * len(spec)))]
+                # print("Creating {} individuals from {} elite of a species of {}".format(sz, len(elite), len(spec)))
+                for _ in range(sz): 
+                    a = None 
+                    b = None 
+                    if np.random.random() < 0.1: 
+                        a = spec[np.random.randint(0, len(spec))] 
+                    else: 
+                        a = elite[np.random.randint(0, len(elite))] 
+
+                    if np.random.random() < 0.1: 
+                        b = spec[np.random.randint(0, len(spec))] 
+                    else: 
+                        b = elite[np.random.randint(0, len(elite))] 
+
+                    c = self.crossover(a, b) 
+                    self.mutate(c) 
+                    self.pop.append(c) 
+
+        last = self.species
+        self.species = {} 
+
+        for g in self.pop: 
+            if g.species is not None: 
+                self._add_genome_to_species_list(g) 
+
+        species_threshold = 2.0
+
+        for g in self.pop: 
+            if g.species is None: 
+                found = False 
+                for s in last: 
+                    lst = last[s]
+                    compare = lst[np.random.randint(0, len(lst))] 
+                    dist = self.distance(g, compare) 
+
+                    # print("Checking distance to species {}: {}".format(s, dist))
+
+                    if dist < species_threshold: 
+                        g.species = s 
+                        self._add_genome_to_species_list(g) 
+                        found = True 
+                        break 
+                
+                if not found: 
+                    g.species = self.next_species() 
+                    self.species[g.species] = [g] 
+                    last[g.species] = [g] 
+
+        return [self.create_network(g) for g in self.pop] 
 
     def tell(self, scores: list): 
-        raise NotImplementedError 
+        inds = np.argsort(scores)[::-1]
+
+        for i in range(self.n_pop): 
+            self.pop[i].fitness = scores[i] 
+
+        mean_fit = 0
+        spec_fit = { s: 0 for s in self.species } 
+        for g in self.pop: 
+            g.adj_fitness = g.fitness / len(self.species[g.species]) 
+            spec_fit[g.species] += g.adj_fitness 
+            mean_fit += g.adj_fitness 
+        mean_fit /= self.n_pop 
+        
+        # print("Current species: ") 
+        # self._print_species() 
+
+        # print("New species sizes: ")
+        self.spec_sizes = {} 
+        total_size = 0 
+        for s in self.species: 
+            sz = int(spec_fit[s] / mean_fit)
+            total_size += sz 
+            self.spec_sizes[s] = sz
+            # print("{}".format(sz))
+        # print("Total size: {}".format(total_size))
+
+        spec_keys = [s for s in self.species]
+
+        while total_size < self.n_pop: 
+            self.spec_sizes[spec_keys[np.random.randint(0, len(spec_keys))]] += 1
+            total_size += 1
+
+        while total_size > self.n_pop: 
+            s = spec_keys[np.random.randint(0, len(spec_keys))]
+            self.spec_sizes[s] -= 1
+            if self.spec_sizes[s] <= 0: 
+                del self.spec_sizes[s] 
+                spec_keys.remove(s) 
+            total_size -= 1
+
+        # print("Corrected sizes: ")
+        # for s in self.species: 
+        #     print("{}".format(self.spec_sizes[s]))
+        # print("Total size: {}".format(total_size))
+
+        print("Generation {}: species: {}, best - {:0.3f}, avg - {:0.3f}".format(self.generation, len(self.species), scores[inds[0]], np.mean(scores)))
+
+        net = self.create_network(self.pop[inds[0]])
+        # print("Best genome:  {}".format(net.genome))
+        print("Best network: {}".format(net))
+        print("{}".format(net.predict([0, 0])))
+        print("{}".format(net.predict([0, 1])))
+        print("{}".format(net.predict([1, 0])))
+        print("{}".format(net.predict([1, 1])))
+
+    def _add_genome_to_species_list(self, genome: Genome): 
+        if genome.species is None: 
+            raise Exception("Genome must have species before adding it to a species list") 
+        if genome.species not in self.species: 
+            self.species[genome.species] = [genome] 
+        else: 
+            self.species[genome.species].append(genome) 
+
+    def _print_species(self): 
+        for s in self.species: 
+            print("{}: {} individuals".format(s, len(self.species[s])))#, self.species[s][0]))
+
+    def create_network(self, genome: Genome): 
+        return Network(genome, self.activations) 
 
     def create_genome(self): 
         nodes = [] 
@@ -122,7 +357,7 @@ class Neat:
 
         return Genome(self.n_inputs, self.n_outputs, nodes, conns) 
 
-    def distance(self, a: Genome, b: Genome, conn_d: float=1.0, conn_w: float=1.0, node_d: float=1.0, node_w: float=1.0, node_a: float=1.0): 
+    def distance(self, a: Genome, b: Genome, conn_d: float=0.1, conn_w: float=0.1, node_d: float=0.5, node_w: float=0.1, node_a: float=1.0): 
         disjoint_conns = 0 
         weights_conns = 0
         disjoint_nodes = 0 
@@ -237,7 +472,11 @@ class Neat:
 
         return Genome(a.n_inputs, a.n_outputs, nodes, conns) 
 
-    def mutate(self, g: Genome, add_node: float=0.1, add_conn: float=0.1, toggle_conn: float=0.1, nudge_weight: float=0.5, change_weight: float=0.05, nudge_strength: float=0.1, change_strength: float=1.0): 
+    def mutate(self, g: Genome, add_node: float=0.1, add_conn: float=1.0, toggle_conn: float=0.0, nudge_weight: float=0.5, change_weight: float=0.1, nudge_strength: float=0.1, change_strength: float=1.0): 
+        g.fitness = None 
+        g.adj_fitness = None 
+        g.species = None 
+        
         if np.random.random() < add_node: 
             a = np.random.randint(0, len(g.nodes) + self.n_inputs)
             if a >= self.n_inputs: 
@@ -248,6 +487,10 @@ class Neat:
 
             create = True 
             conn = None 
+
+            # TODO remove this
+            if a_layer != 0 or b_layer != 1: 
+                create = False
 
             # cannot add connection on same layer 
             if a_layer == b_layer: 
@@ -268,12 +511,12 @@ class Neat:
                 node = self.next_node(), layer, 'sigmoid', np.random.randn() * change_strength 
                 g.nodes.append(node) 
 
-                conn_a = self.next_innov(), True, a, node[0], np.random.randn() * change_strength 
-                conn_b = self.next_innov(), True, node[0], b, np.random.randn() * change_strength 
+                conn_a = self.get_innov(a, node[0]), True, a, node[0], np.random.randn() * change_strength 
+                conn_b = self.get_innov(node[0], b), True, node[0], b, np.random.randn() * change_strength 
 
                 # conn ids will be largest yet so appending will keep list sorted 
-                g.conns.append(conn_a) 
-                g.conns.append(conn_b) 
+                g.add_conn(conn_a) 
+                g.add_conn(conn_b) 
 
         if np.random.random() < add_conn: 
             a = np.random.randint(0, len(g.nodes) + self.n_inputs)
@@ -293,30 +536,30 @@ class Neat:
                 a_layer, b_layer = b_layer, a_layer 
                 a, b = b, a 
             # check if exists 
-            if g.find_conn(a, b) is not None: 
+            e = g.find_conn(a, b)
+            if e is not None: 
                 create = False 
 
             if create: 
-                # conn id will be largest yet so appending will keep list sorted 
-                conn = self.next_innov(), True, a, b, np.random.randn() * change_strength 
-                g.conns.append(conn) 
+                conn = self.get_innov(a, b), True, a, b, np.random.randn() * change_strength 
+                g.add_conn(conn) 
 
         eps = 1e-2
 
         for i in range(len(g.nodes)): 
             node = g.nodes[i] 
             if np.random.random() < change_weight: 
-                node = (*node[:-1], node[-1] + np.random.randn() * change_strength * (node[-1] + eps))
+                node = (*node[:-1], np.random.randn() * change_strength)# * (node[-1] + eps))
             if np.random.random() < nudge_weight: 
-                node = (*node[:-1], node[-1] + np.random.randn() * nudge_strength * (node[-1] + eps))
+                node = (*node[:-1], node[-1] + np.random.randn() * nudge_strength)# * (node[-1] + eps))
             g.nodes[i] = node 
 
         for i in range(len(g.conns)): 
             conn = g.conns[i] 
             if np.random.random() < change_weight: 
-                conn = (*conn[:-1], conn[-1] + np.random.randn() * change_strength * (conn[-1] + eps))
+                conn = (*conn[:-1], np.random.randn() * change_strength)# * (conn[-1] + eps))
             if np.random.random() < nudge_weight: 
-                conn = (*conn[:-1], conn[-1] + np.random.randn() * nudge_strength * (conn[-1] + eps))
+                conn = (*conn[:-1], conn[-1] + np.random.randn() * nudge_strength)# * (conn[-1] + eps))
             if np.random.random() < toggle_conn: 
                 conn = (conn[0], not conn[1], *conn[2:])
             g.conns[i] = conn 
@@ -324,18 +567,49 @@ class Neat:
         return g 
 
 if __name__ == "__main__": 
-    neat = Neat(2, 1) 
+    neat = Neat(2, 1, n_pop=100) 
 
-    a = neat.create_genome() 
-    b = neat.create_genome() 
-    print(a)  
-    print(b) 
-    print(neat.distance(a, b)) 
-    print() 
-    c = neat.crossover(a, b) 
-    print(c) 
-    print() 
-    neat.mutate(c, add_conn=1, add_node=1)
-    print(c) 
-    print() 
-    print(c.get_config()) 
+    # g = Genome(2, 1, [
+    #     (2, 1.0, 'sigmoid', -30), 
+    #     (3, 0.5, 'sigmoid', -10), 
+    #     (4, 0.5, 'sigmoid', 30) 
+    # ], [
+    #     (1, True, 0, 3, 20.0), 
+    #     (2, True, 1, 3, 20.0), 
+    #     (3, True, 0, 4, -20.0), 
+    #     (4, True, 1, 4, -20.0),
+    #     (5, True, 3, 2, 20.0), 
+    #     (6, True, 4, 2, 20.0)
+    # ])
+
+    # nn = neat.create_network(g) 
+    # print(nn) 
+    # print(nn.predict([0, 0])) 
+    # print(nn.predict([0, 1])) 
+    # print(nn.predict([1, 0])) 
+    # print(nn.predict([1, 1])) 
+
+    # f = 0 
+    # p = 1.0
+    # f += np.power(np.abs(nn.predict([0, 0]) - 1), p) 
+    # f += np.power(np.abs(nn.predict([0, 1]) - 0), p) 
+    # f += np.power(np.abs(nn.predict([1, 0]) - 0), p) 
+    # f += np.power(np.abs(nn.predict([1, 1]) - 1), p) 
+    # f = np.sum(f) 
+    # print(f) 
+
+    for _ in range(10000): 
+        pop = neat.ask() 
+        fit = [] 
+
+        for nn in pop: 
+            f = 0 
+            p = 2.0
+            f += np.power(np.abs(nn.predict([0, 0]) - 1), p) 
+            f += np.power(np.abs(nn.predict([0, 1]) - 0), p) 
+            f += np.power(np.abs(nn.predict([1, 0]) - 0), p) 
+            f += np.power(np.abs(nn.predict([1, 1]) - 1), p) 
+            f = np.sum(f) 
+            fit.append(f) 
+
+        neat.tell(fit) 
