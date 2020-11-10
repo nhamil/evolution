@@ -212,47 +212,65 @@ class Species:
             g.adj_fitness = g.fitness / len(self.genomes) 
             total += g.adj_fitness 
         self.mean_fitness = total / len(self.genomes) 
+        self.sum_fitness = total 
         self.mean_true_fitness = sum(g.fitness for g in self.genomes) / len(self.genomes) 
 
         self.genomes.sort(key=lambda x: -x.fitness) 
 
 class Neat: 
 
-    def __init__(self, nin: int, nout: int, npop: int=100): 
+    def __init__(self, nin: int, nout: int, args: dict={}): 
         self.n_inputs = nin 
         self.n_outputs = nout 
-        self.n_pop = npop 
-        self.n_elite = int(0.1 * npop) 
+        self.n_pop = args.get('n_pop', 100)  
+        self.n_elite = args.get('n_elite', int(0.1 * self.n_pop)) 
         self.pop = None 
         self.species = [] 
 
-        self.species_threshold = 2.0 
-        self.survive_threshold = 0.3 
+        self.clear_species = args.get('clear_species', 5) 
+        self.species_threshold = args.get('species_threshold', 1.0) 
+        self.survive_threshold = args.get('survive_threshold', 0.3)  
+        self.max_species = args.get('max_species', 20)  
 
-        self.dist_disjoint = 1.0 
-        self.dist_weight = 0.1 
-        self.dist_activation = 1.0 
+        self.dist_disjoint = args.get('dist_disjoint', 1.0)  
+        self.dist_weight = args.get('dist_weight', 0.05)  
+        self.dist_activation = args.get('dist_activation', 1.0)  
 
-        self.std_mutate_weight = 1.0 
-        self.std_replace_weight = 1.0 
+        self.std_mutate_weight = args.get('std_mutate', 1.0) 
+        self.std_replace_weight = args.get('std_new', 1.0) 
 
-        self.prob_mutate_weight = 0.7 
-        self.prob_replace_weight = 0.1
-        self.prob_add_conn = 0.5 
-        self.prob_add_node = 0.01 
-        self.prob_toggle_conn = 0.0 
-        self.prob_replace_activation = 0.1
+        self.prob_mutate_weight = args.get('prob_mutate_weight', 0.8)  
+        self.prob_replace_weight = args.get('prob_replace_weight', 0.1) 
+        self.prob_add_conn = args.get('prob_add_conn', 0.7)  
+        self.prob_add_node = args.get('prob_add_node', 0.1)  
+        self.prob_toggle_conn = args.get('prob_toggle_conn', 0.1)  
+        self.prob_replace_activation = args.get('prob_replace_activation', 0.2) 
 
         self.gen = 0 
+        self.last_fit = -float('inf') 
+        self.last_inc = 0 
 
-        self.activations = {
+        activations = {
             'linear': lambda x: x, 
             'sigmoid': lambda x: 1.0 / (1.0 + np.exp(-x)), 
             'step': lambda x: 1.0 if x > 0.5 else 0.0, 
             'abs': lambda x: abs(x), 
-            'clamped': lambda x: -1.0 if x < -1.0 else 1.0 if x > 1.0 else x, 
-            'relu': lambda x: 0.0 if x < 0.0 else x  
+            'clamp': lambda x: -1.0 if x < -1.0 else 1.0 if x > 1.0 else x, 
+            'relu': lambda x: 0.0 if x < 0.0 else x, 
+            'sin': lambda x: np.sin(x), 
+            'tanh': lambda x: np.tanh(x) 
         }
+
+        extra = args.get('custom_activations') 
+        if extra is not None: 
+            for k in extra: 
+                activations[k] = extra[k] 
+
+        acts = args.get('activations', ['linear', 'sigmoid', 'step', 'abs', 'clamp', 'relu', 'sin', 'tanh']) 
+
+        self.activations = {} 
+        for k in acts: 
+            self.activations[k] = activations[k] 
 
         self.conn_ids = {} 
         self.cur_conn_id = -1 
@@ -277,10 +295,9 @@ class Neat:
 
         for i in range(len(self.pop)): 
             g = self.pop[i] 
+            # print(g) 
             g.fitness = scores[i]
             self._add_to_species(g) 
-
-        self.species = [s for s in self.species if len(s.genomes) > 0] 
 
         self.pop.sort(key=lambda x: -x.fitness) 
         for s in self.species: 
@@ -288,16 +305,37 @@ class Neat:
 
         print("Generation {}: species: {}, best - {:0.3f}, avg - {:0.3f}".format(
             self.gen, 
-            len([s for s in self.species if len(s.genomes) > 0]), 
+            len(self.species),  
             self.pop[0].fitness, 
             sum([g.fitness for g in self.pop]) / self.n_pop 
         ))
-        net = self.create_network(self.pop[0])
-        print("Best: ({:0.3f}) {}".format(net.genome.fitness, net))
-        print("- [0 0] = {:0.3f}".format(net.predict([0, 0])[0]))
-        print("- [0 1] = {:0.3f}".format(net.predict([0, 1])[0]))
-        print("- [1 0] = {:0.3f}".format(net.predict([1, 0])[0]))
-        print("- [1 1] = {:0.3f}".format(net.predict([1, 1])[0]))
+
+        if self.last_fit < self.pop[0].fitness: 
+            self.last_fit = self.pop[0].fitness 
+            self.last_inc = 0 
+        else: 
+            self.last_inc += 1 
+
+        self.species.sort(key=lambda s: -s.mean_fitness)
+        if len(self.species) > self.max_species: 
+            self.species = [s for s in self.species[:self.max_species]] 
+
+        if self.last_inc >= self.clear_species: 
+            self.last_inc = 0 
+            tmp = self.species 
+            self.species = [] 
+            for i in range(min(2, len(tmp))): 
+                self.species.append(tmp[i]) 
+            print("Taking too long to update fitness, clearing old species")
+
+        self.species = [s for s in self.species if self.survive_threshold * len(s.genomes) >= 1] 
+
+        # net = self.create_network(self.pop[0])
+        # print("Best: ({:0.3f}) {}".format(net.genome.fitness, net))
+        # print("- [0 0] = {:0.3f}".format(net.predict([0, 0])[0]))
+        # print("- [0 1] = {:0.3f}".format(net.predict([0, 1])[0]))
+        # print("- [1 0] = {:0.3f}".format(net.predict([1, 0])[0]))
+        # print("- [1 1] = {:0.3f}".format(net.predict([1, 1])[0]))
 
         # print("Keeping best {} individuals".format(self.n_elite))
 
@@ -308,18 +346,20 @@ class Neat:
         total_fit = 0.0 
         offset = 0.0 
         count = 0 
+
+        # print("Iterating over {} species".format(len(self.species)))
+
         for s in self.species: 
             if len(s.genomes) == 0: 
                 continue 
-            if s.mean_fitness < offset: 
-                offset = s.mean_fitness 
-            total_fit += s.mean_fitness + 1 
+            if s.mean_fitness < -offset: 
+                offset = -s.mean_fitness 
+            total_fit += s.mean_fitness 
             count += 1 
         total_fit += offset * len(self.species) 
 
-        self.species.sort(key=lambda s: -s.mean_fitness)
-
         n_remain = self.n_pop - len(tmp_pop) 
+        total_ratio = 0.0 
         for s in self.species: 
             if len(s.genomes) == 0: 
                 continue 
@@ -328,15 +368,20 @@ class Neat:
             if total_fit == 0: 
                 ratio = 1.0 / count 
             else: 
-                ratio = 1.0 - (s.mean_fitness + 1) / total_fit 
-            ratio *= n_remain 
+                ratio = (s.mean_fitness + offset) / total_fit 
 
-            select = max(0, int(self.survive_threshold * len(s.genomes))) 
+            # print(ratio) 
+
+            ratio = int(ratio * n_remain) 
+            
+            select = max(1, int(self.survive_threshold * len(s.genomes))) 
 
             # print("Adding {} children from {} individuals".format(int(ratio), select))
 
             if select <= 0: 
                 continue 
+
+            total_ratio += ratio 
 
             for _ in range(int(ratio)): 
                 if len(tmp_pop) == self.n_pop: 
@@ -348,16 +393,21 @@ class Neat:
                 c = self.crossover(a, b) 
                 tmp_pop.append(c) 
         
+        # print("Total ratio: {}".format(total_ratio))
         # print("Adding {} random children".format(self.n_pop - len(tmp_pop)))
 
         while len(tmp_pop) < self.n_pop: 
-            a = self.pop[np.random.randint(0, self.n_pop)] 
-            b = self.pop[np.random.randint(0, self.n_pop)] 
-            c = self.crossover(a, b) 
-            tmp_pop.append(c) 
+            if len(self.species) == 0: 
+                tmp_pop.append(self.create_genome())
+            else: 
+                s = self.species[np.random.randint(0, len(self.species))]
+                a = s.genomes[np.random.randint(0, len(s.genomes))] 
+                b = s.genomes[np.random.randint(0, len(s.genomes))] 
+                c = self.crossover(a, b) 
+                tmp_pop.append(c) 
 
-        for s in self.species: 
-            print('Species: {:0.3f}, {:0.3f}, {}, n={}, c={}'.format(s.mean_fitness, s.mean_true_fitness, len(s.genomes), len(s.compare.nodes), len(s.compare.conns)))
+        # for s in self.species: 
+        #     print('Species: {:0.3f}, {:0.3f}, {:0.3f}, {}, n={}, c={}'.format(s.sum_fitness, s.mean_fitness, s.mean_true_fitness, len(s.genomes), len(s.compare.nodes), len(s.compare.conns)))
 
         self.pop = tmp_pop 
 
@@ -440,7 +490,7 @@ class Neat:
         disjoint_nodes += len(b.nodes) - bi 
 
         dist_conns = self.dist_disjoint * disjoint_conns / N_conns + self.dist_weight * weights_conns 
-        dist_nodes = self.dist_disjoint * disjoint_nodes / N_nodes + self.dist_weight * weights_nodes + self.dist_activation * act_nodes
+        dist_nodes = self.dist_disjoint * disjoint_nodes / N_nodes + self.dist_weight * weights_nodes + self.dist_activation * act_nodes / N_nodes
 
         return dist_conns + dist_nodes
 
@@ -508,8 +558,8 @@ class Neat:
         # mutate connections 
         for gene in g.conns: 
             # enabled
-            # if self.chance(self.prob_toggle_conn): 
-            #     gene.enabled = not gene.enabled 
+            if self.chance(self.prob_toggle_conn): 
+                gene.enabled = not gene.enabled 
             # weight 
             if self.chance(self.prob_mutate_weight): 
                 gene.weight += self._mutate_weight()
@@ -517,14 +567,13 @@ class Neat:
                 gene.weight = self._new_weight()
 
         # mutate nodes 
-        # TODO activation 
         for gene in g.nodes: 
             # bias 
             if self.chance(self.prob_mutate_weight): 
                 gene.bias += self._mutate_weight()
             elif self.chance(self.prob_replace_weight): 
                 gene.bias = self._new_weight()
-
+            # activation 
             if self.chance(self.prob_replace_activation): 
                 gene.activation = self._new_activation() 
 
@@ -613,24 +662,48 @@ class Neat:
         return np.random.random() < pct 
 
 if __name__ == "__main__":
-    neat = Neat(2, 1, npop=500) 
+    pop = None 
+    fit = None
 
-    for _ in range(100): 
-        pop = neat.ask() 
-        fit = [] 
+    attempts = 100
+    success = 0  
+    gens = 0 
 
-        for nn in pop: 
-            f = 4 
-            p = 2.0
-            f -= np.power(np.abs(nn.predict([0, 0]) - 0), p) 
-            f -= np.power(np.abs(nn.predict([0, 1]) - 1), p) 
-            f -= np.power(np.abs(nn.predict([1, 0]) - 1), p) 
-            f -= np.power(np.abs(nn.predict([1, 1]) - 0), p) 
-            f = np.sum(f) 
-            fit.append(f) 
+    for i in range(attempts): 
+        neat = Neat(2, 1, {
+            'n_pop': 500, 
+        }) 
 
-        neat.tell(fit) 
+        for _ in range(100): 
+            pop = neat.ask() 
+            fit = [] 
 
-        if np.max(fit) >= 3.9: 
-            print("Early stopping") 
-            break 
+            for nn in pop: 
+                f = 4 
+                p = 2.0
+                f -= np.power(np.abs(nn.predict([0, 0]) - 0), p) 
+                f -= np.power(np.abs(nn.predict([0, 1]) - 1), p) 
+                f -= np.power(np.abs(nn.predict([1, 0]) - 1), p) 
+                f -= np.power(np.abs(nn.predict([1, 1]) - 0), p) 
+                f = np.sum(f) 
+                fit.append(f) 
+
+            print('Iteration {}: '.format(i+1), end='') 
+            neat.tell(fit) 
+
+            if np.max(fit) >= 3.8: 
+                print("Early stopping") 
+                gens += neat.gen 
+                success += 1
+                break 
+
+    print("Success rate: {:0.2f}%, Average generations: {:0.2f}".format(100 * success / attempts, gens / success))
+
+    i = np.argmax(fit) 
+    score = fit[i] 
+    net = pop[i] 
+    print("Score: {:0.3f}, Net: {}".format(score, net))
+    print("- [0 0] = {:0.3f}".format(net.predict([0, 0])[0]))
+    print("- [0 1] = {:0.3f}".format(net.predict([0, 1])[0]))
+    print("- [1 0] = {:0.3f}".format(net.predict([1, 0])[0]))
+    print("- [1 1] = {:0.3f}".format(net.predict([1, 1])[0]))
