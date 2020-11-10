@@ -217,9 +217,59 @@ class Species:
 
         self.genomes.sort(key=lambda x: -x.fitness) 
 
+def linear(x): 
+    return x 
+
+def sigmoid(x): 
+    return 1.0 / (1.0 + np.exp(-x)) 
+
+def step(x): 
+    return 1.0 if x > 0.5 else 0.0 
+
+def abs(x): 
+    return np.abs(x) 
+
+def clamp(x): 
+    return -1.0 if x < -1.0 else 1.0 if x > 1.0 else x 
+
+def relu(x): 
+    return max(0.0, x) 
+
+def sin(x): 
+    return np.sin(x) 
+
+def tanh(x): 
+    return np.tanh(x) 
+    
 class Neat: 
 
+    args = {
+        'n_pop', 
+        'n_elite', 
+        'clear_species', 
+        'species_threshold', 
+        'survive_threshold', 
+        'max_species', 
+        'dist_disjoint', 
+        'dist_weight', 
+        'dist_activation', 
+        'std_mutate', 
+        'std_new', 
+        'prob_mutate_weight', 
+        'prob_replace_weight', 
+        'prob_add_conn', 
+        'prob_add_node', 
+        'prob_toggle_conn', 
+        'prob_replace_activation', 
+        'custom_activations', 
+        'activations'
+    }
+
     def __init__(self, nin: int, nout: int, args: dict={}): 
+        for key in args: 
+            if key not in Neat.args: 
+                raise Exception("Unknown argument: {}".format(key)) 
+
         self.n_inputs = nin 
         self.n_outputs = nout 
         self.n_pop = args.get('n_pop', 100)  
@@ -251,14 +301,14 @@ class Neat:
         self.last_inc = 0 
 
         activations = {
-            'linear': lambda x: x, 
-            'sigmoid': lambda x: 1.0 / (1.0 + np.exp(-x)), 
-            'step': lambda x: 1.0 if x > 0.5 else 0.0, 
-            'abs': lambda x: abs(x), 
-            'clamp': lambda x: -1.0 if x < -1.0 else 1.0 if x > 1.0 else x, 
-            'relu': lambda x: 0.0 if x < 0.0 else x, 
-            'sin': lambda x: np.sin(x), 
-            'tanh': lambda x: np.tanh(x) 
+            'linear': linear, 
+            'sigmoid': sigmoid, 
+            'step': step,  
+            'abs': abs, 
+            'clamp': clamp, 
+            'relu': relu, 
+            'sin': sin, 
+            'tanh': tanh 
         }
 
         extra = args.get('custom_activations') 
@@ -489,8 +539,8 @@ class Neat:
         disjoint_nodes += len(a.nodes) - ai 
         disjoint_nodes += len(b.nodes) - bi 
 
-        dist_conns = self.dist_disjoint * disjoint_conns / N_conns + self.dist_weight * weights_conns 
-        dist_nodes = self.dist_disjoint * disjoint_nodes / N_nodes + self.dist_weight * weights_nodes + self.dist_activation * act_nodes / N_nodes
+        dist_conns = self.dist_disjoint * disjoint_conns / N_conns + self.dist_weight * weights_conns / N_conns
+        dist_nodes = self.dist_disjoint * disjoint_nodes / N_nodes + self.dist_weight * weights_nodes / N_nodes + self.dist_activation * act_nodes / N_nodes
 
         return dist_conns + dist_nodes
 
@@ -606,7 +656,7 @@ class Neat:
                 # print("Connection {} added between {} and {}".format(caid, a, nid)) 
                 # print("Connection {} added between {} and {}".format(cbid, nid, b)) 
 
-                node = NodeGene(nid, node_layer, 'sigmoid', self._new_weight()) 
+                node = NodeGene(nid, node_layer, self._new_activation(), self._new_weight()) 
                 ca = ConnGene(caid, True, a, nid, self._new_weight())
                 cb = ConnGene(cbid, True, nid, b, self._new_weight())
                 conn.enabled = False 
@@ -665,13 +715,15 @@ if __name__ == "__main__":
     pop = None 
     fit = None
 
-    attempts = 100
+    attempts = 1
     success = 0  
     gens = 0 
 
     for i in range(attempts): 
         neat = Neat(2, 1, {
             'n_pop': 500, 
+            'activations': ['sigmoid'], 
+            'prob_add_node': 0.3 
         }) 
 
         for _ in range(100): 
