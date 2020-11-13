@@ -19,10 +19,10 @@ def convolve2D(imgs: np.ndarray, k: np.ndarray, stride: int=1):
     a: (num, channel, y, x) \\
     k: (filter, channel, y, x) 
     """ 
-    print() 
-    print(imgs.shape) 
-    print(k.shape) 
-    print(stride) 
+    # print() 
+    # print(imgs.shape) 
+    # print(k.shape) 
+    # print(stride) 
 
     sa = imgs[0].shape 
     sk = k.shape 
