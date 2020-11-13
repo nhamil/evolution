@@ -497,8 +497,8 @@ class Neat:
         weights_nodes = 0 
         act_nodes = 0 
 
-        N_conns = max(len(a.conns), len(b.conns)) 
-        N_nodes = max(len(a.nodes), len(b.nodes)) 
+        N_conns = min(len(a.conns), len(b.conns)) 
+        N_nodes = min(len(a.nodes), len(b.nodes)) 
 
         ai = 0 
         bi = 0 
@@ -549,7 +549,7 @@ class Neat:
         conns = [] 
 
         for i in range(self.n_outputs): 
-            nodes.append(NodeGene(self.n_inputs+i, 1, 'sigmoid', self._new_weight())) 
+            nodes.append(NodeGene(self.n_inputs+i, 1, self._new_activation(), self._new_weight())) 
 
         for i in range(self.n_inputs): 
             for j in range(self.n_outputs): 

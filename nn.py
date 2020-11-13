@@ -104,7 +104,7 @@ class Dense(Layer):
         return (self.nodes,)
 
     def eval(self, x): 
-        print("Eval: {}".format(x))
+        # print("Eval: {}".format(x))
         return self.a(np.dot(x, self.W) + self.b) 
         
     def get_weights(self): 
