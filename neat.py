@@ -630,7 +630,7 @@ class Neat:
         # add node 
         if self.chance(self.prob_add_node): 
             # print("Attempting to add node") 
-            for _ in range(1): 
+            for _ in range(5): 
                 conn = g.conns[np.random.randint(0, len(g.conns))] 
 
                 if not conn.enabled: 
@@ -669,7 +669,7 @@ class Neat:
         # add connection 
         if self.chance(self.prob_add_conn): 
             # print("Attempting to add connection") 
-            for _ in range(1): # find random nodes an arbitrary amount of times 
+            for _ in range(5): # find random nodes an arbitrary amount of times 
                 a = np.random.randint(0, len(g.nodes) + self.n_inputs)
                 if a >= self.n_inputs: 
                     a = g.nodes[a - self.n_inputs].id 

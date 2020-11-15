@@ -107,10 +107,6 @@ if __name__ == "__main__":
     m_cfg = x.get_config() 
     del i, x 
 
-    # hn = HyperNeat(m_cfg, {
-    #     'n_pop': 100
-    # })
-
     pop = None 
     fit = None
 
@@ -120,9 +116,9 @@ if __name__ == "__main__":
 
     for i in range(attempts): 
         hn = HyperNeat(m_cfg, {
-            'n_pop': 500, 
+            'n_pop': 100, 
             'max_species': 100, 
-            'species_threshold': 3.0, 
+            'species_threshold': 1.5, 
             'clear_species': 15, 
             'prob_add_node': 0.3, 
             'prob_replace_weight': 0.4, 
