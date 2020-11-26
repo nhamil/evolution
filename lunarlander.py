@@ -17,7 +17,7 @@ env = gym.make('LunarLanderContinuous-v2')
 
 # sys.exit(0) 
 
-def fitness_cartpole(net: neat.Network, render: bool=False, steps=1000): 
+def fitness_lander(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
 
     for _ in range(3): 
@@ -92,8 +92,8 @@ if __name__ == "__main__":
             pop = n.ask() 
 
             for ind in pop: 
-                # scores.append(fitness_cartpole(ind, render=False, steps=LENGTH)) 
-                scores.append(pool.apply_async(fitness_cartpole, ((ind, False, LENGTH)))) 
+                # scores.append(fitness_lander(ind, render=False, steps=LENGTH)) 
+                scores.append(pool.apply_async(fitness_lander, ((ind, False, LENGTH)))) 
 
             scores = [s.get() for s in scores] 
 
@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
                 ind = pop[np.argmax(scores)] 
                 # print(ind) 
-                fitness_cartpole(ind, render=True) 
+                fitness_lander(ind, render=True) 
 
             if max_score == LENGTH: 
                 times += 1 
