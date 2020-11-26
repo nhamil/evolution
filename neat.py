@@ -316,7 +316,8 @@ class Neat:
             for k in extra: 
                 activations[k] = extra[k] 
 
-        acts = args.get('activations', ['linear', 'sigmoid', 'step', 'abs', 'clamp', 'relu', 'sin', 'tanh']) 
+        # acts = args.get('activations', ['linear', 'sigmoid', 'step', 'abs', 'clamp', 'relu', 'sin', 'tanh']) 
+        acts = args.get('activations', ['sigmoid', 'step', 'abs', 'clamp', 'sin', 'tanh']) 
 
         self.activations = {} 
         for k in acts: 

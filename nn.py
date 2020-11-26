@@ -4,17 +4,16 @@ from typing import Union
 
 import numpy as np 
 import numpy.lib.stride_tricks as st 
-import scipy as sp 
-import scipy.signal as signal 
 import matplotlib.pyplot as plt 
 
 activations = {
     'sigmoid': lambda x: 1.0 / (1.0 + np.exp(-x)), 
     'linear': lambda x: x, 
-    'relu': lambda x: np.maximum(0.0, x) 
+    'relu': lambda x: np.maximum(0.0, x), 
+    'tanh': lambda x: np.tanh(x) 
 }
 
-def convolve2D(imgs: np.ndarray, k: np.ndarray, stride: int=1):
+def convolve_2d(imgs: np.ndarray, k: np.ndarray, stride: int=1):
     """
     a: (num, channel, y, x) \\
     k: (filter, channel, y, x) 
@@ -48,6 +47,43 @@ def convolve2D(imgs: np.ndarray, k: np.ndarray, stride: int=1):
             c[i] = np.reshape(ci, (1, *so))
 
     return c_list
+
+def max_pool_2d(a: np.ndarray): 
+    """
+    a: (num, channel, y, x) 
+    """ 
+    a00 = a[:,:,0::2,0::2]
+    a01 = a[:,:,0::2,1::2]
+    a10 = a[:,:,1::2,0::2]
+    a11 = a[:,:,1::2,1::2]
+    out = np.empty((a00.shape)) 
+    max_out = out[:,:,:a11.shape[2],:a11.shape[3]]
+    max_out[:] = np.maximum(
+        np.maximum(
+            a00[:,:,:a11.shape[2],:a11.shape[3]], 
+            a01[:,:,:a11.shape[2],:a11.shape[3]] 
+        ), 
+        np.maximum(
+            a10[:,:,:a11.shape[2],:a11.shape[3]], 
+            a11[:,:,:a11.shape[2],:a11.shape[3]]
+        )
+    )
+
+    if a00.shape[2] == a11.shape[2]: 
+        if a00.shape[3] == a11.shape[3]: # all dimensions good 
+            pass 
+        else: # (y good, x bad) 
+            out[:,:,:,-1] = np.maximum(a00[:,:,:,-1], a10[:,:,:,-1]) 
+    else: 
+        if a00.shape[3] == a11.shape[3]: # (y bad, x good) 
+            out[:,:,-1,:] = np.maximum(a00[:,:,-1,:], a01[:,:,-1,:]) 
+        else: # (y bad, x bad) 
+            out[:,:,-1,:-1] = np.maximum(a00[:,:,-1,:-1], a01[:,:,-1,:]) 
+            out[:,:,:-1,-1] = np.maximum(a00[:,:,:-1,-1], a10[:,:,:,-1]) 
+            out[:,:,-1, -1] = a00[:,:,-1,-1]
+            pass 
+
+    return out 
 
 class Input: 
 
@@ -154,7 +190,7 @@ class Conv2D(Layer):
                 (in_shape[2] - self.size) // self.stride + 1, 
             )
         self.out_shape = out_shape 
-        print(self.out_shape) 
+        # print(self.out_shape) 
 
         return out_shape 
 
@@ -164,7 +200,7 @@ class Conv2D(Layer):
         if self.padding == 'same': 
             pass 
         else: 
-            return self.a(convolve2D(x, self.W, self.stride)) 
+            return self.a(convolve_2d(x, self.W, self.stride)) 
 
     def get_weights(self): 
         return [np.copy(self.W)] 
@@ -180,6 +216,29 @@ class Conv2D(Layer):
             'stride': self.stride, 
             'activation': self.activation  
         }
+
+class MaxPool2D(Layer): 
+
+    def __init__(self): 
+        super(MaxPool2D, self).__init__() 
+
+    def build(self, in_shape: tuple): 
+        if len(in_shape) != 3: 
+            raise Exception('Expected input shape to be 3 dimension') 
+
+        return (in_shape[0], int(np.ceil(in_shape[1] / 2)), int(np.ceil(in_shape[2] / 2)))
+
+    def eval(self, x): 
+        return max_pool_2d(x) 
+        
+    def get_weights(self): 
+        return [] 
+
+    def set_weights(self, weights): 
+        pass
+
+    def get_config(self): 
+        return {}
 
 class Flatten(Layer): 
 
@@ -218,7 +277,8 @@ class Model:
     layer_types = {
         'Dense': Dense, 
         'Flatten': Flatten, 
-        'Conv2D': Conv2D 
+        'Conv2D': Conv2D, 
+        'MaxPool2D': MaxPool2D 
     }
 
     def __init__(self, input: Input, output: Layer): 
@@ -240,8 +300,10 @@ class Model:
         if len(x.shape) != len(self.__input.output_shape) + 1: 
             raise Exception("Expected input shape of {} but got {}".format((None, *self.__input.output_shape), x.shape))
         self.__input.output = x 
+        # print('input', x.shape)
         for layer in self.layers: 
             x = layer(layer.input.output) 
+            # print(layer, x.shape)
         return x 
 
     def get_config(self): 
