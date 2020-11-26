@@ -181,10 +181,12 @@ class Network:
         s += ']'
         return s 
 
-    def predict(self, x): 
+    def clear(self): 
         for i in self.nodes: 
             self.nodes[i].output = 0 
 
+    def predict(self, x): 
+        
         for i in range(len(self.input_layer)):       
             node = self.input_layer[i]       
             node.output = x[i]
@@ -316,8 +318,7 @@ class Neat:
             for k in extra: 
                 activations[k] = extra[k] 
 
-        # acts = args.get('activations', ['linear', 'sigmoid', 'step', 'abs', 'clamp', 'relu', 'sin', 'tanh']) 
-        acts = args.get('activations', ['sigmoid', 'step', 'abs', 'clamp', 'sin', 'tanh']) 
+        acts = args.get('activations', ['linear', 'sigmoid', 'step', 'abs', 'clamp', 'relu', 'sin', 'tanh']) 
 
         self.activations = {} 
         for k in acts: 
@@ -680,13 +681,13 @@ class Neat:
                 b_layer = g.layer(b) 
 
                 # cannot add connection on same layer 
-                if a_layer == b_layer: 
-                    continue 
+                # if a_layer == b_layer: 
+                #     continue 
 
                 # no recurrent 
-                if a_layer > b_layer: 
-                    a_layer, b_layer = b_layer, a_layer 
-                    a, b = b, a 
+                # if a_layer > b_layer: 
+                #     a_layer, b_layer = b_layer, a_layer 
+                #     a, b = b, a 
 
                 # connection must not already exist 
                 if (a, b) in g.nodes_to_conn: 

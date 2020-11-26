@@ -1,26 +1,36 @@
-import sys 
+import neat 
 
 import numpy as np 
 import atari_py 
 import gym 
 
-import nn 
-import hyperneat 
+import multiprocessing as mp 
+import sys 
 
-env = gym.make('CartPole-v0') 
+env = gym.make('CartPole-v1') 
 
-def fitness_env(env, net: nn.Model, render: bool=False, steps=1000): 
+# print('Input:', env.reset().shape) 
+# print('Output:', env.action_space) 
+# sys.exit(0) 
+
+# for x in gym.envs.registry.all(): 
+#     print(x) 
+
+def fitness_cartpole(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
     env._max_episode_steps = steps
     obs = env.reset() 
+
+    net.clear() 
 
     while True: 
         close = False
 
         if render: 
             close = not env.render()
+            # print(obs) 
 
-        res = net.predict(np.expand_dims(obs, 0))[0]
+        res = net.predict(obs)
         action = np.argmax(res) 
 
         obs, reward, done, _ = env.step(action)
@@ -30,60 +40,69 @@ def fitness_env(env, net: nn.Model, render: bool=False, steps=1000):
         if done or close: 
             break
 
+    if render: 
+        print(score) 
+        env.close() 
+
     return score 
 
-x = i = nn.Input((4,)) 
-x = nn.Dense(2)(x) 
-x = nn.Dense(2)(x) 
-net = nn.Model(i, x) 
+if __name__ == "__main__": 
+    neat_args = {
+        'n_pop': 100, 
+        'max_species': 30, 
+        'species_threshold': 1.0, 
+        'survive_threshold': 0.5, 
+        'clear_species': 15, 
+        'prob_add_node': 0.01, 
+        'prob_add_conn': 0.5, 
+        'prob_replace_weight': 0.01, 
+        'prob_mutate_weight': 0.5, 
+        'prob_toggle_conn': 0.01, 
+        'prob_replace_activation': 0.1, 
+        'std_new': 1.0, 
+        'std_mutate': 0.1, 
+        'activations': ['sigmoid'], 
+        'dist_weight': 0.4, 
+        'dist_activation': 1.0, 
+        'dist_disjoint': 1.0  
+    }
 
-args = {
-    'n_pop': 100, 
-    'max_species': 20, 
-    'species_threshold': 1.5, 
-    'clear_species': 15, 
-    'prob_add_node': 0.3, 
-    'prob_replace_weight': 0.4, 
-    'prob_mutate_weight': 0.9, 
-    'prob_toggle_conn': 0.3, 
-    'prob_replace_activation': 0.4, 
-    'std_new': 10.0, 
-    'std_mutate': 0.1 
-}
+    n = neat.Neat(4, 2, neat_args) 
 
-hn = hyperneat.HyperNeat(net.get_config(), args) 
+    # pool = mp.Pool() 
 
-filename_out = sys.argv[1]
-file_out = open(filename_out, "w+") 
+    LENGTH = 10000
+    times = 0 
 
-file_out.write("hyperneat-{}\n".format(args['n_pop']))
+    try: 
+        for i in range(1000): 
+            scores = [] 
+            pop = n.ask() 
 
-scores = [] 
-pop = [] 
+            for ind in pop: 
+                scores.append(fitness_cartpole(ind, steps=LENGTH)) 
+                # scores.append(pool.apply_async(fitness_xor, ((ind,)))) 
 
-MAX_STEPS = 5000
-last_good = False 
+            # scores = [s.get() for s in scores] 
 
-for i in range(500): 
-    pop = hn.ask() 
+            n.tell(scores) 
 
-    scores.clear() 
-    for ind in pop: 
-        scores.append(fitness_env(env, ind, False, steps=MAX_STEPS))
+            max_score = np.max(scores)  
 
-    hn.tell(scores) 
+            ind = pop[np.argmax(scores)] 
+            ind = pop[np.argmax(scores)] 
+            print(ind) 
+            fitness_cartpole(ind, render=True) 
 
-    if np.max(scores) >= MAX_STEPS: 
-        if last_good: 
-            break 
-        else: 
-            last_good = True 
-    else: 
-        last_good = False 
+            if max_score == LENGTH: 
+                times += 1 
+            else: 
+                times = 0 
 
-    file_out.write("{}\n".format(np.max(scores)))
+            if times == 5: 
+                ind = pop[np.argmax(scores)] 
+                print(ind) 
+                break 
 
-print("Best score:", np.max(scores))
-print("Long score:", fitness_env(env, pop[np.argmax(scores)], True, steps=100000))
-
-file_out.close() 
+    except Exception as e: 
+        print("Error while training:", e) 
