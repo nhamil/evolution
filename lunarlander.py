@@ -20,7 +20,11 @@ env = gym.make('LunarLanderContinuous-v2')
 def fitness_lander(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
 
-    for _ in range(3): 
+    n = 10 
+    if render: 
+        n = 3
+
+    for _ in range(n): 
         env._max_episode_steps = steps
         obs = env.reset() 
 
@@ -55,11 +59,32 @@ def fitness_lander(net: neat.Network, render: bool=False, steps=1000):
         if close: 
             break 
 
-    return score / 3
+    env.close() 
+
+    return score / n
 
 if __name__ == "__main__": 
+    # neat_args = {
+    #     'n_pop': 500, 
+    #     'max_species': 30, 
+    #     'species_threshold': 1.0, 
+    #     'survive_threshold': 0.5, 
+    #     'clear_species': 100, 
+    #     'prob_add_node': 0.01, 
+    #     'prob_add_conn': 0.05, 
+    #     'prob_replace_weight': 0.01, 
+    #     'prob_mutate_weight': 0.5, 
+    #     'prob_toggle_conn': 0.01, 
+    #     'prob_replace_activation': 0.1, 
+    #     'std_new': 1.0, 
+    #     'std_mutate': 0.01, 
+    #     'activations': ['sigmoid'], 
+    #     'dist_weight': 0.4, 
+    #     'dist_activation': 1.0, 
+    #     'dist_disjoint': 1.0  
+    # }
     neat_args = {
-        'n_pop': 500, 
+        'n_pop': 300, 
         'max_species': 30, 
         'species_threshold': 1.0, 
         'survive_threshold': 0.5, 
@@ -100,21 +125,22 @@ if __name__ == "__main__":
             n.tell(scores) 
 
             max_score = np.max(scores)  
-            if max_score > best: 
-                best = max_score 
+            if True: 
+                if max_score > best: 
+                    best = max_score 
 
                 ind = pop[np.argmax(scores)] 
                 # print(ind) 
                 fitness_lander(ind, render=True) 
 
-            if max_score == LENGTH: 
-                times += 1 
-            else: 
-                times = 0 
+            # if max_score == LENGTH: 
+            #     times += 1 
+            # else: 
+            #     times = 0 
 
-            if times == 5: 
-                print(ind) 
-                break 
+            # if times == 5: 
+            #     print(ind) 
+            #     break 
 
     except Exception as e: 
         print("Error while training:", e) 

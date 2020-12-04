@@ -8,6 +8,9 @@ class NodeGene:
         self.activation = activation 
         self.bias = bias 
 
+    def export(self): 
+        return (self.id, self.layer, self.activation, self.bias) 
+
     @staticmethod
     def copy(g): 
         return NodeGene(g.id, g.layer, g.activation, g.bias) 
@@ -28,6 +31,9 @@ class ConnGene:
         self.a = a 
         self.b = b 
         self.weight = weight
+
+    def export(self): 
+        return (self.id, self.enabled, self.a, self.b, self.weight)
 
     @staticmethod 
     def copy(g): 
@@ -62,6 +68,13 @@ class Genome:
 
         for node in nodes: 
             self.add_node(node) 
+
+    def export(self): 
+        return (self.n_inputs, self.n_outputs, [n.export() for n in self.nodes], [c.export() for c in self.conns])
+
+    @staticmethod 
+    def load(data): 
+        return Genome(data[0], data[1], [NodeGene(*d) for d in data[2]], [ConnGene(*d) for d in data[3]])
 
     @staticmethod
     def copy(g): 
@@ -380,7 +393,8 @@ class Neat:
                 self.species.append(tmp[i]) 
             print("Taking too long to update fitness, clearing old species")
 
-        self.species = [s for s in self.species if self.survive_threshold * len(s.genomes) >= 1] 
+        # self.species = [s for s in self.species if self.survive_threshold * len(s.genomes) >= 0] 
+        self.species = [s for s in self.species if len(s.genomes) >= 1] 
 
         # net = self.create_network(self.pop[0])
         # print("Best: ({:0.3f}) {}".format(net.genome.fitness, net))
@@ -396,7 +410,7 @@ class Neat:
             tmp_pop.append(self.pop[i]) 
 
         total_fit = 0.0 
-        offset = 0.0 
+        offset = 1.0 
         count = 0 
 
         # print("Iterating over {} species".format(len(self.species)))
@@ -449,14 +463,15 @@ class Neat:
         # print("Adding {} random children".format(self.n_pop - len(tmp_pop)))
 
         while len(tmp_pop) < self.n_pop: 
-            if len(self.species) == 0: 
-                tmp_pop.append(self.create_genome())
-            else: 
-                s = self.species[np.random.randint(0, len(self.species))]
-                a = s.genomes[np.random.randint(0, len(s.genomes))] 
-                b = s.genomes[np.random.randint(0, len(s.genomes))] 
-                c = self.crossover(a, b) 
-                tmp_pop.append(c) 
+            tmp_pop.append(self.create_genome())
+            # if len(self.species) == 0: 
+                # tmp_pop.append(self.create_genome())
+            # else: 
+                # s = self.species[np.random.randint(0, len(self.species))]
+                # a = s.genomes[np.random.randint(0, len(s.genomes))] 
+                # b = s.genomes[np.random.randint(0, len(s.genomes))] 
+                # c = self.crossover(a, b) 
+                # tmp_pop.append(c) 
 
         # for s in self.species: 
         #     print('Species: {:0.3f}, {:0.3f}, {:0.3f}, {}, n={}, c={}'.format(s.sum_fitness, s.mean_fitness, s.mean_true_fitness, len(s.genomes), len(s.compare.nodes), len(s.compare.conns)))

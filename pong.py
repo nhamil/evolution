@@ -7,7 +7,7 @@ import gym
 import multiprocessing as mp 
 import sys 
 
-env = gym.make('BipedalWalker-v3') 
+env = gym.make('Pong-ram-v4') 
 
 # print('Input:', env.reset().shape) 
 # print('Output:', env.action_space) 
@@ -20,7 +20,7 @@ env = gym.make('BipedalWalker-v3')
 def fitness_walker(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
 
-    for _ in range(3): 
+    for _ in range(1): 
         # env._max_episode_steps = steps
         obs = env.reset() 
 
@@ -35,9 +35,10 @@ def fitness_walker(net: neat.Network, render: bool=False, steps=1000):
                 close = not env.render()
                 # print(obs) 
 
+            obs = obs / 256 
+
             res = net.predict(obs)
-            res = res * 2 - 1 
-            action = res #np.argmax(res) 
+            action = np.argmax(res) 
 
             obs, reward, done, _ = env.step(action)
 
@@ -56,28 +57,9 @@ def fitness_walker(net: neat.Network, render: bool=False, steps=1000):
         if close: 
             break 
 
-    return score / 3
+    return score
 
 if __name__ == "__main__": 
-    # neat_args = {
-    #     'n_pop': 100, 
-    #     'max_species': 30, 
-    #     'species_threshold': 1.0, 
-    #     'survive_threshold': 0.5, 
-    #     'clear_species': 100, 
-    #     'prob_add_node': 0.01, 
-    #     'prob_add_conn': 0.05, 
-    #     'prob_replace_weight': 0.01, 
-    #     'prob_mutate_weight': 0.5, 
-    #     'prob_toggle_conn': 0.01, 
-    #     'prob_replace_activation': 0.1, 
-    #     'std_new': 1.0, 
-    #     'std_mutate': 0.01, 
-    #     'activations': ['sigmoid'], 
-    #     'dist_weight': 0.5, 
-    #     'dist_activation': 1.0, 
-    #     'dist_disjoint': 1.0  
-    # }
     neat_args = {
         'n_pop': 100, 
         'max_species': 30, 
@@ -87,24 +69,24 @@ if __name__ == "__main__":
         'prob_add_node': 0.01, 
         'prob_add_conn': 0.05, 
         'prob_replace_weight': 0.01, 
-        'prob_mutate_weight': 0.5, 
+        'prob_mutate_weight': 0.2, 
         'prob_toggle_conn': 0.01, 
         'prob_replace_activation': 0.1, 
         'std_new': 1.0, 
-        'std_mutate': 0.01, 
+        'std_mutate': 0.1, 
         'activations': ['sigmoid'], 
         'dist_weight': 0.5, 
         'dist_activation': 1.0, 
         'dist_disjoint': 1.0  
     }
 
-    n = neat.Neat(24, 4, neat_args) 
+    n = neat.Neat(128, 6, neat_args) 
 
     pool = mp.Pool() 
 
     LENGTH = 1000
     times = 0 
-    best = 0 #-float('inf') 
+    best = -float('inf') 
 
     try: 
         for i in range(1000): 

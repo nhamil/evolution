@@ -1,5 +1,4 @@
 import neat 
-import comm 
 
 import matplotlib.pyplot as plt 
 import numpy as np 
@@ -40,13 +39,14 @@ def fitness_car_race(net: neat.Network, render: bool=False, steps=1000):
                 # print(obs) 
 
             obs = obs / 255.0 
+            obs_in = obs[::8,::8]
 
-            if render: 
-                plt.cla() 
-                plt.imshow(obs[::8,::8,1]) 
-                plt.pause(0.00001) 
+            # if render: 
+            #     plt.cla() 
+            #     plt.imshow(obs_in[:,:,1]) 
+            #     plt.pause(0.00001) 
 
-            res = net.predict(obs[::8,::8,1].flatten())
+            res = net.predict(obs_in.flatten())
             res = res * 2 - 1 
             action = res #np.argmax(res) 
 
@@ -98,26 +98,13 @@ if __name__ == "__main__":
     times = 0 
     best = -float('inf') 
 
-    print("Reading") 
-    f = open('models/car_{:03d}.neat'.format(25), 'rb') 
-    in_data = f.read() 
-    net = n.create_network(neat.Genome.load(comm.decode(in_data))) 
-
-    # print(ind) 
-    fitness_car_race(net, render=True) 
-
-    print("Done") 
-    sys.exit(0) 
-
-    hist = open('models/car_neat_hist.txt', 'w')  
-
     try: 
         for i in range(1000): 
             scores = [] 
             pop = n.ask() 
 
             for ind in pop: 
-                # scores.append(fitness_car_race(ind, render=False, steps=LENGTH)) 
+                # scores.append(fitness_car_race(ind, render=True, steps=LENGTH)) 
                 scores.append(pool.apply_async(fitness_car_race, ((ind, False, LENGTH)))) 
 
             scores = [s.get() for s in scores] 
@@ -125,31 +112,13 @@ if __name__ == "__main__":
             n.tell(scores) 
 
             max_score = np.max(scores)  
-            if max_score > best: 
-                best = max_score 
+            if True: 
+                if max_score > best: 
+                    best = max_score 
 
-            print("Writing...", end='') 
-            hist.write("{}, {}, \n".format(
-                max_score, 
-                np.mean(scores)
-            ))
-            hist.flush() 
-
-            ind = pop[np.argmax(scores)] 
-            
-            f = open('models/car_{:03d}.neat'.format(i+1), 'wb') 
-            out = comm.encode(ind.genome.export())
-            f.write(out)
-            f.close()  
-            print("Done") 
-
-            # print("Reading") 
-            # f = open('models/car_{:03d}.neat'.format(i+1), 'rb') 
-            # in_data = f.read() 
-            # net = n.create_network(neat.Genome.load(comm.decode(in_data))) 
-
-            # print(ind) 
-            fitness_car_race(ind, render=True) 
+                ind = pop[np.argmax(scores)] 
+                # print(ind) 
+                fitness_car_race(ind, render=True) 
 
             if max_score >= LENGTH: 
                 times += 1 
@@ -160,7 +129,5 @@ if __name__ == "__main__":
                 print(ind) 
                 break 
 
-    # except Exception as e: 
-    #     print("Error while training:", e) 
-    finally: 
-        pass 
+    except Exception as e: 
+        print("Error while training:", e) 

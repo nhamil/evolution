@@ -18,37 +18,42 @@ env = gym.make('CartPole-v1')
 
 def fitness_cartpole(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
-    env._max_episode_steps = steps
-    obs = env.reset() 
+    
+    for _ in range(3): 
+        env._max_episode_steps = steps
+        obs = env.reset() 
+        net.clear() 
 
-    net.clear() 
+        s = 0
 
-    while True: 
-        close = False
+        while True: 
+            close = False
+
+            if render: 
+                close = not env.render()
+                # print(obs) 
+
+            res = net.predict(obs)
+            action = np.argmax(res) 
+
+            obs, reward, done, _ = env.step(action)
+
+            s += reward
+
+            if done or close: 
+                break
+
+        score += s 
 
         if render: 
-            close = not env.render()
-            # print(obs) 
+            print(s) 
+            env.close() 
 
-        res = net.predict(obs)
-        action = np.argmax(res) 
-
-        obs, reward, done, _ = env.step(action)
-
-        score += reward
-
-        if done or close: 
-            break
-
-    if render: 
-        print(score) 
-        env.close() 
-
-    return score 
+    return score / 3
 
 if __name__ == "__main__": 
     neat_args = {
-        'n_pop': 100, 
+        'n_pop': 50, 
         'max_species': 30, 
         'species_threshold': 1.0, 
         'survive_threshold': 0.5, 
@@ -91,7 +96,7 @@ if __name__ == "__main__":
 
             ind = pop[np.argmax(scores)] 
             ind = pop[np.argmax(scores)] 
-            print(ind) 
+            # print(ind) 
             fitness_cartpole(ind, render=True) 
 
             if max_score == LENGTH: 
