@@ -1,4 +1,5 @@
-import neat 
+import es 
+import nn
 import comm 
 
 import matplotlib.pyplot as plt 
@@ -21,14 +22,27 @@ env = gym.make('CarRacing-v0')
 
 plt.ion() 
 
-def fitness_car_race(net: neat.Network, render: bool=False, steps=1000): 
+x = i = nn.Input((2*96//8*96//8*3//3,)) 
+x = nn.Dense(20)(x) 
+x = nn.Dense(3)(x) 
+net = nn.Model(i, x) 
+del x, i 
+
+outw, outs = nn.get_vectorized_weights(net) 
+
+def fitness_car_race(w, render: bool=False, steps=1000): 
     score = 0
 
-    for _ in range(3): 
+    nn.set_vectorized_weights(net, w, outs) 
+
+    n = 2
+
+    for _ in range(n): 
         # env._max_episode_steps = steps
         obs = env.reset() 
+        last_obs = np.array(obs) / 255.0
 
-        net.clear() 
+        # net.clear() 
 
         s = 0
 
@@ -41,15 +55,19 @@ def fitness_car_race(net: neat.Network, render: bool=False, steps=1000):
 
             obs = obs / 255.0 
 
-            if render: 
-                plt.cla() 
-                plt.imshow(obs[::8,::8,1]) 
-                plt.pause(0.00001) 
+            # if render: 
+            #     plt.cla() 
+            #     plt.imshow(obs[::8,::8,1]) 
+            #     plt.pause(0.00001) 
 
-            res = net.predict(obs[::8,::8,1].flatten())
+            res = net.predict(np.expand_dims(np.concatenate([
+                last_obs[::8,::8,1].flatten(), 
+                obs[::8,::8,1].flatten()
+            ]), 0))[0]
             res = res * 2 - 1 
             action = res #np.argmax(res) 
 
+            last_obs = obs 
             obs, reward, done, _ = env.step(action)
 
             s += reward
@@ -67,30 +85,18 @@ def fitness_car_race(net: neat.Network, render: bool=False, steps=1000):
         if close: 
             break 
 
-    return score / 3
+    return score / n
 
 if __name__ == "__main__": 
-    neat_args = {
-        'n_pop': 100, 
-        'max_species': 30, 
-        'species_threshold': 1.0, 
-        'survive_threshold': 0.5, 
-        'clear_species': 100, 
-        'prob_add_node': 0.01, 
-        'prob_add_conn': 0.05, 
-        'prob_replace_weight': 0.01, 
-        'prob_mutate_weight': 0.5, 
-        'prob_toggle_conn': 0.01, 
-        'prob_replace_activation': 0.1, 
-        'std_new': 1.0, 
-        'std_mutate': 0.01, 
-        'activations': ['sigmoid'], 
-        'dist_weight': 0.5, 
-        'dist_activation': 1.0, 
-        'dist_disjoint': 1.0  
-    }
-
-    n = neat.Neat(96//8*96//8*1, 3, neat_args) 
+    e = es.EvolutionStrategy(
+        outw, 
+        1.0, 
+        100, 
+        10, 
+        min_sigma=1e-3, 
+        big_sigma=1e1, 
+        wait_iter=5
+    )
 
     pool = mp.Pool() 
 
@@ -99,30 +105,39 @@ if __name__ == "__main__":
     best = -float('inf') 
 
     print("Reading") 
-    f = open('models/car_{:03d}.neat'.format(25), 'rb') 
-    in_data = f.read() 
-    net = n.create_network(neat.Genome.load(comm.decode(in_data))) 
+    f = open('models/car_{:03d}.es'.format(67), 'rb') 
+    in_data = comm.decode(f.read())
+    print(in_data) 
 
     # print(ind) 
-    fitness_car_race(net, render=True) 
+    fitness_car_race(in_data, render=True) 
 
     print("Done") 
     sys.exit(0) 
 
-    hist = open('models/car_neat_hist.txt', 'w')  
+    hist = open('models/car_es_hist.txt', 'w')  
 
     try: 
         for i in range(1000): 
             scores = [] 
-            pop = n.ask() 
+            pop = e.ask() 
 
             for ind in pop: 
                 # scores.append(fitness_car_race(ind, render=False, steps=LENGTH)) 
                 scores.append(pool.apply_async(fitness_car_race, ((ind, False, LENGTH)))) 
 
-            scores = [s.get() for s in scores] 
+            thread_scores = scores 
+            scores = []
 
-            n.tell(scores) 
+            ii = 0 
+            for s in thread_scores: 
+                scores.append(s.get())
+                ii += 1 
+                print("{} / {}".format(ii, len(thread_scores)), end='\r')
+
+            # scores = [s.get() for s in scores] 
+
+            e.tell(scores) 
 
             max_score = np.max(scores)  
             if max_score > best: 
@@ -137,8 +152,8 @@ if __name__ == "__main__":
 
             ind = pop[np.argmax(scores)] 
             
-            f = open('models/car_{:03d}.neat'.format(i+1), 'wb') 
-            out = comm.encode(ind.genome.export())
+            f = open('models/car_{:03d}.es'.format(i+1), 'wb') 
+            out = comm.encode(ind)
             f.write(out)
             f.close()  
             print("Done") 

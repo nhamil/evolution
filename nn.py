@@ -6,6 +6,8 @@ import numpy as np
 import numpy.lib.stride_tricks as st 
 import matplotlib.pyplot as plt 
 
+import util 
+
 activations = {
     'sigmoid': lambda x: 1.0 / (1.0 + np.exp(-x)), 
     'linear': lambda x: x, 
@@ -323,3 +325,35 @@ class Model:
     def set_weights(self, weights): 
         for i in range(len(self.layers)): 
             self.layers[i].set_weights(weights[i]) 
+
+def get_vectorized_weights(model: Model): 
+    weights = model.get_weights() 
+
+    outs = [] 
+    outw = []
+
+    for layer in weights: 
+        shapes = [] 
+        for w in layer: 
+            shapes.append(w.shape) 
+            outw.append(w.flatten()) 
+        outs.append(shapes) 
+
+    return np.concatenate(outw), outs 
+
+def set_vectorized_weights(model: Model, outw, outs): 
+    weights = [] 
+
+    i = 0 
+
+    for layer in outs: 
+        shapes = [] 
+        for s in layer: 
+            size = util.shape_size(s) 
+            shapes.append(
+                outw[i:i+size].reshape(s)
+            )
+            i += size 
+        weights.append(shapes) 
+    
+    model.set_weights(weights) 

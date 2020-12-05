@@ -60,6 +60,25 @@ def fitness_walker(net: neat.Network, render: bool=False, steps=1000):
     return score
 
 if __name__ == "__main__": 
+    # neat_args = {
+    #     'n_pop': 100, 
+    #     'max_species': 30, 
+    #     'species_threshold': 1.0, 
+    #     'survive_threshold': 0.5, 
+    #     'clear_species': 100, 
+    #     'prob_add_node': 0.01, 
+    #     'prob_add_conn': 0.05, 
+    #     'prob_replace_weight': 0.01, 
+    #     'prob_mutate_weight': 0.2, 
+    #     'prob_toggle_conn': 0.01, 
+    #     'prob_replace_activation': 0.1, 
+    #     'std_new': 1.0, 
+    #     'std_mutate': 0.1, 
+    #     'activations': ['sigmoid'], 
+    #     'dist_weight': 0.5, 
+    #     'dist_activation': 1.0, 
+    #     'dist_disjoint': 1.0  
+    # }
     neat_args = {
         'n_pop': 100, 
         'max_species': 30, 
@@ -69,11 +88,11 @@ if __name__ == "__main__":
         'prob_add_node': 0.01, 
         'prob_add_conn': 0.05, 
         'prob_replace_weight': 0.01, 
-        'prob_mutate_weight': 0.2, 
+        'prob_mutate_weight': 0.5, 
         'prob_toggle_conn': 0.01, 
         'prob_replace_activation': 0.1, 
         'std_new': 1.0, 
-        'std_mutate': 0.1, 
+        'std_mutate': 0.01, 
         'activations': ['sigmoid'], 
         'dist_weight': 0.5, 
         'dist_activation': 1.0, 
@@ -110,15 +129,6 @@ if __name__ == "__main__":
                 ind = pop[np.argmax(scores)] 
                 # print(ind) 
                 fitness_walker(ind, render=True) 
-
-            if max_score >= LENGTH: 
-                times += 1 
-            else: 
-                times = 0 
-
-            if times == 5: 
-                print(ind) 
-                break 
 
     except Exception as e: 
         print("Error while training:", e) 

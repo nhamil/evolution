@@ -20,16 +20,16 @@ if __name__ == "__main__":
         'species_threshold': 1.0, 
         'survive_threshold': 0.5, 
         'clear_species': 15, 
-        'prob_add_node': 0.01, 
+        'prob_add_node': 0.001, 
         'prob_add_conn': 0.01, 
         'prob_replace_weight': 0.01, 
         'prob_mutate_weight': 0.5, 
         'prob_toggle_conn': 0.01, 
         'prob_replace_activation': 0.1, 
         'std_new': 1.0, 
-        'std_mutate': 0.1, 
+        'std_mutate': 1.0, 
         'activations': ['sigmoid'], 
-        'dist_weight': 0.4, 
+        'dist_weight': 0.05, 
         'dist_activation': 1.0, 
         'dist_disjoint': 1.0  
     }
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     pool = mp.Pool() 
 
     try: 
-        for i in range(1000): 
+        for i in range(100): 
             scores = [] 
             pop = n.ask() 
 
@@ -53,7 +53,8 @@ if __name__ == "__main__":
 
             max_score = np.max(scores)  
             
-            if max_score >= 3.9: 
+            # if max_score >= 3.99999: 
+            if i == 99: 
                 ind = pop[np.argmax(scores)] 
                 print(ind) 
                 print(ind.predict([0, 0])) 
