@@ -1,6 +1,5 @@
 import es 
 import nn
-import distrib 
 
 import numpy as np 
 import atari_py 
@@ -26,7 +25,7 @@ del x, i
 
 outw, outs = nn.get_vectorized_weights(net) 
 
-def fitness_pong(w, render: bool=False, steps=1000): 
+def fitness_walker(w, render: bool=False, steps=1000): 
     score = 0
 
     nn.set_vectorized_weights(net, w, outs) 
@@ -79,9 +78,7 @@ if __name__ == "__main__":
         wait_iter=15
     )
 
-    # pool = mp.Pool(processes=9) 
-    pool = distrib.DistributedServer() 
-    pool.start() 
+    pool = mp.Pool(processes=9) 
 
     LENGTH = 1000
     times = 0 
@@ -93,17 +90,15 @@ if __name__ == "__main__":
             pop = e.ask() 
 
             for ind in pop: 
-                # scores.append(fitness_pong(ind, render=True, steps=LENGTH)) 
-                # scores.append(pool.apply_async(fitness_pong, ((ind, False, LENGTH)))) 
-                scores.append(pool.execute('pong_es', { 'w': ind })) 
+                # scores.append(fitness_walker(ind, render=True, steps=LENGTH)) 
+                scores.append(pool.apply_async(fitness_walker, ((ind, False, LENGTH)))) 
 
             thread_scores = scores 
             scores = []
 
             ii = 0 
             for s in thread_scores: 
-                scores.append(s.result())
-                # scores.append(s.get())
+                scores.append(s.get())
                 ii += 1 
                 print("{} / {}".format(ii, len(thread_scores)), end='\r')
 
@@ -119,10 +114,7 @@ if __name__ == "__main__":
 
                 ind = pop[np.argmax(scores)] 
                 # print(ind) 
-                fitness_pong(ind, render=True) 
+                fitness_walker(ind, render=True) 
 
     except Exception as e: 
         print("Error while training:", e) 
-
-    finally: 
-        pool.stop() 

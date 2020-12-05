@@ -8,6 +8,12 @@ import time
 import distrib 
 import es 
 
+def task_pong_es(data={}, shared={}): 
+    import pong_es 
+    return pong_es.fitness_pong(data['w']) 
+
+distrib.register_task('pong_es', task_pong_es)
+
 def cmd(): 
     while True: 
         x = input().lower() 
@@ -16,22 +22,6 @@ def cmd():
         else: 
             print("Unknown command: {}".format(x)) 
         time.sleep(1) 
-
-class MyPool: 
-
-    def __init__(self, n_threads): 
-        self.n_threads = n_threads 
-        self.queue = mp.Queue() 
-        self.procs = [mp.Process(target=self._run, args=(self.queue,)) for _ in range(n_threads)] 
-        for proc in self.procs: 
-            proc.start() 
-
-    def _run(self, queue): 
-        print("run") 
-        pass 
-
-    def execute(self, fn, args=None): 
-        self.queue.put((fn, args)) 
 
 if __name__ == "__main__": 
     mp.set_start_method("spawn") 
