@@ -8,6 +8,7 @@ import gym
 
 import multiprocessing as mp 
 import sys 
+import time
 
 env = gym.make('Pong-ram-v4') 
 
@@ -31,7 +32,7 @@ def fitness_pong(w, render: bool=False, steps=1000):
 
     nn.set_vectorized_weights(net, w, outs) 
 
-    for _ in range(1): 
+    for _ in range(3): 
         # env._max_episode_steps = steps
         obs = env.reset() 
 
@@ -66,7 +67,7 @@ def fitness_pong(w, render: bool=False, steps=1000):
         if close: 
             break 
 
-    return score
+    return score / 3
 
 if __name__ == "__main__": 
     e = es.EvolutionStrategy(
@@ -82,6 +83,10 @@ if __name__ == "__main__":
     # pool = mp.Pool(processes=9) 
     pool = distrib.DistributedServer() 
     pool.start() 
+
+    print("Waiting for connections...") 
+    time.sleep(5) 
+    print("Done!") 
 
     LENGTH = 1000
     times = 0 
