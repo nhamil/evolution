@@ -72,11 +72,11 @@ if __name__ == "__main__":
     e = es.EvolutionStrategy(
         outw, 
         5.0, 
-        1000, 
+        3000, 
         15, 
         min_sigma=1e-3, 
-        big_sigma=1e1, 
-        wait_iter=15
+        big_sigma=5e-2, 
+        wait_iter=100000
     )
 
     # pool = mp.Pool(processes=9) 
