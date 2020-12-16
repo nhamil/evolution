@@ -3,7 +3,6 @@ import comm
 
 import matplotlib.pyplot as plt 
 import numpy as np 
-import atari_py 
 import gym 
 
 import multiprocessing as mp 
@@ -98,18 +97,7 @@ if __name__ == "__main__":
     times = 0 
     best = -float('inf') 
 
-    # print("Reading") 
-    # f = open('models/car_{:03d}.neat'.format(25), 'rb') 
-    # in_data = f.read() 
-    # net = n.create_network(neat.Genome.load(comm.decode(in_data))) 
-
-    # # print(ind) 
-    # fitness_car_race(net, render=True) 
-
-    # print("Done") 
-    # sys.exit(0) 
-
-    hist = open('models/car_neat_hist.txt', 'w')  
+    hist = open('car_neat_hist.txt', 'w')  
 
     try: 
         for i in range(1000): 
@@ -129,7 +117,7 @@ if __name__ == "__main__":
                 best = max_score 
 
             print("Writing...", end='') 
-            hist.write("{}, {}, \n".format(
+            hist.write("{}, {} \n".format(
                 max_score, 
                 np.mean(scores)
             ))

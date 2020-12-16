@@ -2,7 +2,6 @@ __pycache__/
 .vscode/
 .venv/
 env/ 
-models/
-models-old/
-stockfish/ 
-chess_logs/ 
+env2/ 
+env3/ 
+env4/ 

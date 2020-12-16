@@ -1,7 +1,6 @@
 import neat 
 
 import numpy as np 
-import atari_py 
 import gym 
 
 import multiprocessing as mp 
