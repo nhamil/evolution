@@ -32,7 +32,7 @@ def fitness_pong(w, render: bool=False, steps=1000):
 
     nn.set_vectorized_weights(net, w, outs) 
 
-    for _ in range(1): 
+    for _ in range(3): 
         # env._max_episode_steps = steps
         obs = env.reset() 
 
@@ -67,20 +67,26 @@ def fitness_pong(w, render: bool=False, steps=1000):
         if close: 
             break 
 
-    return score 
+    return score / 3
 
 if __name__ == "__main__": 
     e = es.EvolutionStrategy(
         outw, 
         1.0, 
-        50, # much smaller than distributed 
+        1000, 
         15, 
         min_sigma=1e-3, 
         big_sigma=5e-2, 
         wait_iter=100000
     )
 
-    pool = mp.Pool(processes=12) 
+    # pool = mp.Pool(processes=9) 
+    pool = distrib.DistributedServer() 
+    pool.start() 
+
+    print("Waiting for connections...") 
+    time.sleep(5) 
+    print("Done!") 
 
     LENGTH = 1000
     times = 0 
@@ -93,14 +99,16 @@ if __name__ == "__main__":
 
             for ind in pop: 
                 # scores.append(fitness_pong(ind, render=True, steps=LENGTH)) 
-                scores.append(pool.apply_async(fitness_pong, ((ind, False, LENGTH)))) 
+                # scores.append(pool.apply_async(fitness_pong, ((ind, False, LENGTH)))) 
+                scores.append(pool.execute('pong_es', { 'w': ind })) 
 
             thread_scores = scores 
             scores = []
 
             ii = 0 
             for s in thread_scores: 
-                scores.append(s.get())
+                scores.append(s.result())
+                # scores.append(s.get())
                 ii += 1 
                 print("{} / {}".format(ii, len(thread_scores)), end='\r')
 

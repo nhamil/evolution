@@ -1,6 +1,6 @@
-import es 
-import nn
+import neat 
 import distrib 
+import comm 
 
 import numpy as np 
 import atari_py 
@@ -8,7 +8,7 @@ import gym
 
 import multiprocessing as mp 
 import sys 
-import time
+import time 
 
 env = gym.make('Pong-ram-v4') 
 
@@ -20,21 +20,16 @@ env = gym.make('Pong-ram-v4')
 
 # sys.exit(0) 
 
-x = i = nn.Input((128,)) 
-x = nn.Dense(6)(x) 
-net = nn.Model(i, x) 
-del x, i 
-
-outw, outs = nn.get_vectorized_weights(net) 
-
-def fitness_pong(w, render: bool=False, steps=1000): 
+def fitness_pong(genome, render: bool=False, steps=1000): 
     score = 0
 
-    nn.set_vectorized_weights(net, w, outs) 
+    net = n.create_network(genome)
 
     for _ in range(1): 
         # env._max_episode_steps = steps
         obs = env.reset() 
+
+        net.clear() 
 
         s = 0
 
@@ -47,7 +42,7 @@ def fitness_pong(w, render: bool=False, steps=1000):
 
             obs = obs / 256 
 
-            res = net.predict(np.expand_dims(obs, 0))[0]
+            res = net.predict(obs)
             action = np.argmax(res) 
 
             obs, reward, done, _ = env.step(action)
@@ -67,20 +62,38 @@ def fitness_pong(w, render: bool=False, steps=1000):
         if close: 
             break 
 
-    return score 
+    return score
+
+neat_args = {
+    'n_pop': 100, 
+    'max_species': 30, 
+    'species_threshold': 1.0, 
+    'survive_threshold': 0.5, 
+    'clear_species': 100, 
+    'prob_add_node': 0.01, 
+    'prob_add_conn': 0.05, 
+    'prob_replace_weight': 0.01, 
+    'prob_mutate_weight': 0.5, 
+    'prob_toggle_conn': 0.01, 
+    'prob_replace_activation': 0.1, 
+    'std_new': 1.0, 
+    'std_mutate': 0.01, 
+    'activations': ['sigmoid'], 
+    'dist_weight': 0.5, 
+    'dist_activation': 1.0, 
+    'dist_disjoint': 1.0  
+}
+
+n = neat.Neat(128, 6, neat_args) 
 
 if __name__ == "__main__": 
-    e = es.EvolutionStrategy(
-        outw, 
-        1.0, 
-        50, # much smaller than distributed 
-        15, 
-        min_sigma=1e-3, 
-        big_sigma=5e-2, 
-        wait_iter=100000
-    )
+    # pool = mp.Pool() 
+    pool = distrib.DistributedServer() 
+    pool.start() 
 
-    pool = mp.Pool(processes=12) 
+    print("Waiting for connections...") 
+    time.sleep(5) 
+    print("Done!") 
 
     LENGTH = 1000
     times = 0 
@@ -89,24 +102,23 @@ if __name__ == "__main__":
     try: 
         for i in range(1000): 
             scores = [] 
-            pop = e.ask() 
+            pop = n.ask() 
 
             for ind in pop: 
-                # scores.append(fitness_pong(ind, render=True, steps=LENGTH)) 
-                scores.append(pool.apply_async(fitness_pong, ((ind, False, LENGTH)))) 
+                scores.append(pool.execute('pong_neat', { 'w': ind.genome.export() })) 
 
             thread_scores = scores 
             scores = []
 
             ii = 0 
             for s in thread_scores: 
-                scores.append(s.get())
+                scores.append(s.result())
                 ii += 1 
                 print("{} / {}".format(ii, len(thread_scores)), end='\r')
 
             # scores = [s.get() for s in scores] 
 
-            e.tell(scores) 
+            n.tell(scores) 
 
             max_score = np.max(scores)  
             # if max_score > best: 
@@ -116,10 +128,7 @@ if __name__ == "__main__":
 
                 ind = pop[np.argmax(scores)] 
                 # print(ind) 
-                fitness_pong(ind, render=True) 
+                fitness_pong(ind.genome, render=True) 
 
     except Exception as e: 
         print("Error while training:", e) 
-
-    finally: 
-        pool.stop() 

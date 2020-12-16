@@ -17,7 +17,7 @@ env = gym.make('Pong-ram-v4')
 
 # sys.exit(0) 
 
-def fitness_walker(net: neat.Network, render: bool=False, steps=1000): 
+def fitness_pong(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
 
     for _ in range(1): 
@@ -113,8 +113,8 @@ if __name__ == "__main__":
             pop = n.ask() 
 
             for ind in pop: 
-                # scores.append(fitness_walker(ind, render=True, steps=LENGTH)) 
-                scores.append(pool.apply_async(fitness_walker, ((ind, False, LENGTH)))) 
+                # scores.append(fitness_pong(ind, render=True, steps=LENGTH)) 
+                scores.append(pool.apply_async(fitness_pong, ((ind, False, LENGTH)))) 
 
             scores = [s.get() for s in scores] 
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
                 ind = pop[np.argmax(scores)] 
                 # print(ind) 
-                fitness_walker(ind, render=True) 
+                fitness_pong(ind, render=True) 
 
     except Exception as e: 
         print("Error while training:", e) 

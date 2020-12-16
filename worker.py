@@ -9,10 +9,16 @@ import distrib
 import es 
 
 def task_pong_es(data={}, shared={}): 
-    import pong_es 
-    return pong_es.fitness_pong(data['w']) 
+    import pong_es_distrib 
+    return pong_es_distrib.fitness_pong(data['w']) 
+
+def task_pong_neat(data={}, shared={}): 
+    import pong_neat_distrib 
+    import neat 
+    return pong_neat_distrib.fitness_pong(neat.Genome.load(data['w']))  
 
 distrib.register_task('pong_es', task_pong_es)
+distrib.register_task('pong_neat', task_pong_neat)
 
 def cmd(): 
     while True: 

@@ -396,15 +396,6 @@ class Neat:
         # self.species = [s for s in self.species if self.survive_threshold * len(s.genomes) >= 0] 
         self.species = [s for s in self.species if len(s.genomes) >= 1] 
 
-        # net = self.create_network(self.pop[0])
-        # print("Best: ({:0.3f}) {}".format(net.genome.fitness, net))
-        # print("- [0 0] = {:0.3f}".format(net.predict([0, 0])[0]))
-        # print("- [0 1] = {:0.3f}".format(net.predict([0, 1])[0]))
-        # print("- [1 0] = {:0.3f}".format(net.predict([1, 0])[0]))
-        # print("- [1 1] = {:0.3f}".format(net.predict([1, 1])[0]))
-
-        # print("Keeping best {} individuals".format(self.n_elite))
-
         tmp_pop = [] 
         for i in range(self.n_elite): 
             tmp_pop.append(self.pop[i]) 
@@ -760,7 +751,7 @@ if __name__ == "__main__":
             print('Iteration {}: '.format(i+1), end='') 
             neat.tell(fit) 
 
-            if np.max(fit) >= 3.8: 
+            if np.max(fit) >= 3.99: 
                 print("Early stopping") 
                 gens += neat.gen 
                 success += 1
