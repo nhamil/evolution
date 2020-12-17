@@ -1,3 +1,5 @@
+# Supports hosting a server that sends tasks to workers 
+
 import multiprocessing as mp 
 import random 
 import select 

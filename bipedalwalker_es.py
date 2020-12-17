@@ -1,3 +1,5 @@
+# Trains the bipedal walker problem using ES 
+
 import es 
 import nn
 
@@ -9,21 +11,16 @@ import sys
 
 env = gym.make('BipedalWalker-v3') 
 
-# print('Input:', env.reset().shape) 
-# print('Output:', env.action_space) 
-
-# for x in gym.envs.registry.all(): 
-#     print(x) 
-
-# sys.exit(0) 
-
+# define network architecture 
 x = i = nn.Input((24,)) 
 x = nn.Dense(4)(x) 
 net = nn.Model(i, x) 
 del x, i 
 
+# vectorized weights and original shape information 
 outw, outs = nn.get_vectorized_weights(net) 
 
+# run bipedal walker problem 
 def fitness_walker(w, render: bool=False, steps=1000): 
     score = 0
 
@@ -33,6 +30,7 @@ def fitness_walker(w, render: bool=False, steps=1000):
         # env._max_episode_steps = steps
         obs = env.reset() 
 
+        # total reward (fitness score) 
         s = 0
 
         while True: 
@@ -42,6 +40,7 @@ def fitness_walker(w, render: bool=False, steps=1000):
                 close = not env.render()
                 # print(obs) 
 
+            # determine action to take 
             res = net.predict(np.expand_dims(obs, 0))[0]
             res = res * 2 - 1 
             action = res #np.argmax(res) 
@@ -66,6 +65,7 @@ def fitness_walker(w, render: bool=False, steps=1000):
     return score / 3
 
 if __name__ == "__main__": 
+    # init ES 
     e = es.EvolutionStrategy(
         outw, 
         1.0, 
@@ -76,6 +76,7 @@ if __name__ == "__main__":
         wait_iter=10
     )
 
+    # multiprocessing
     pool = mp.Pool() 
 
     LENGTH = 1000
@@ -87,8 +88,8 @@ if __name__ == "__main__":
             scores = [] 
             pop = e.ask() 
 
+            # eval population 
             for ind in pop: 
-                # scores.append(fitness_walker(ind, render=True, steps=LENGTH)) 
                 scores.append(pool.apply_async(fitness_walker, ((ind, False, LENGTH)))) 
 
             thread_scores = scores 
@@ -100,28 +101,16 @@ if __name__ == "__main__":
                 ii += 1 
                 print("{} / {}".format(ii, len(thread_scores)), end='\r')
 
-            # scores = [s.get() for s in scores] 
-
             e.tell(scores) 
 
             max_score = np.max(scores)  
-            # if max_score > best: 
             if True: 
                 if max_score > best: 
                     best = max_score 
 
+                # show best individual 
                 ind = pop[np.argmax(scores)] 
-                # print(ind) 
                 fitness_walker(ind, render=True) 
-
-            if max_score >= LENGTH: 
-                times += 1 
-            else: 
-                times = 0 
-
-            if times == 5: 
-                print(ind) 
-                break 
 
     except Exception as e: 
         print("Error while training:", e) 

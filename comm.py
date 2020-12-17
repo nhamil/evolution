@@ -1,3 +1,5 @@
+# Used to encode and decode various data that is sent between a server and worker 
+
 from io import BytesIO 
 import collections 
 import socket 

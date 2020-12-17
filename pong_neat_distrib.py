@@ -1,3 +1,5 @@
+# Trains Pong using NEAT with distributed computing 
+
 import neat 
 import distrib 
 import comm 
@@ -12,14 +14,7 @@ import time
 
 env = gym.make('Pong-ram-v4') 
 
-# print('Input:', env.reset().shape) 
-# print('Output:', env.action_space) 
-
-# for x in gym.envs.registry.all(): 
-#     print(x) 
-
-# sys.exit(0) 
-
+# run Pong 
 def fitness_pong(genome, render: bool=False, steps=1000): 
     score = 0
 
@@ -31,6 +26,7 @@ def fitness_pong(genome, render: bool=False, steps=1000):
 
         net.clear() 
 
+        # fitness 
         s = 0
 
         while True: 
@@ -42,6 +38,7 @@ def fitness_pong(genome, render: bool=False, steps=1000):
 
             obs = obs / 256 
 
+            # determine action 
             res = net.predict(obs)
             action = np.argmax(res) 
 
@@ -64,6 +61,7 @@ def fitness_pong(genome, render: bool=False, steps=1000):
 
     return score
 
+# init NEAT 
 neat_args = {
     'n_pop': 100, 
     'max_species': 30, 
@@ -87,7 +85,7 @@ neat_args = {
 n = neat.Neat(128, 6, neat_args) 
 
 if __name__ == "__main__": 
-    # pool = mp.Pool() 
+    # distributed training 
     pool = distrib.DistributedServer() 
     pool.start() 
 
@@ -104,6 +102,7 @@ if __name__ == "__main__":
             scores = [] 
             pop = n.ask() 
 
+            # eval population 
             for ind in pop: 
                 scores.append(pool.execute('pong_neat', { 'w': ind.genome.export() })) 
 
@@ -116,8 +115,6 @@ if __name__ == "__main__":
                 ii += 1 
                 print("{} / {}".format(ii, len(thread_scores)), end='\r')
 
-            # scores = [s.get() for s in scores] 
-
             n.tell(scores) 
 
             max_score = np.max(scores)  
@@ -127,7 +124,6 @@ if __name__ == "__main__":
                     best = max_score 
 
                 ind = pop[np.argmax(scores)] 
-                # print(ind) 
                 fitness_pong(ind.genome, render=True) 
 
     except Exception as e: 

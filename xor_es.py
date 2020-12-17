@@ -1,3 +1,5 @@
+# Trains the XOR problem using ES 
+
 import es 
 import nn 
 
@@ -5,14 +7,17 @@ import numpy as np
 
 import multiprocessing as mp 
 
+# define network architecture 
 x = i = nn.Input((2,)) 
 x = nn.Dense(2)(x) 
 x = nn.Dense(1)(x) 
 net = nn.Model(i, x) 
 del x, i 
 
+# vectorized weights and original shape information 
 outw, outs = nn.get_vectorized_weights(net) 
 
+# test XOR 
 def fitness_xor(w: np.ndarray): 
     total, p = 0, 2
 
@@ -31,6 +36,7 @@ def fitness_xor(w: np.ndarray):
     return 4 - total 
 
 if __name__ == "__main__": 
+    # init ES 
     e = es.EvolutionStrategy(
         outw, 
         1.0, 
@@ -41,18 +47,14 @@ if __name__ == "__main__":
         wait_iter=100
     )
 
-    # pool = mp.Pool() 
-
     try: 
         for i in range(1000): 
             scores = [] 
             pop = e.ask() 
 
+            # eval population  
             for ind in pop: 
                 scores.append(fitness_xor(ind)) 
-                # scores.append(pool.apply_async(fitness_xor, ((ind,)))) 
-
-            # scores = [s.get() for s in scores] 
 
             e.tell(scores) 
 
@@ -74,5 +76,3 @@ if __name__ == "__main__":
 
     finally: 
         pass 
-    # except Exception as e: 
-    #     print("Error while training:", e) 

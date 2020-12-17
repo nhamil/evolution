@@ -1,3 +1,5 @@
+# Train Pong using ES 
+
 import es 
 import nn
 import distrib 
@@ -12,21 +14,16 @@ import time
 
 env = gym.make('Pong-ram-v4') 
 
-# print('Input:', env.reset().shape) 
-# print('Output:', env.action_space) 
-
-# for x in gym.envs.registry.all(): 
-#     print(x) 
-
-# sys.exit(0) 
-
+# define network architecture 
 x = i = nn.Input((128,)) 
 x = nn.Dense(6)(x) 
 net = nn.Model(i, x) 
 del x, i 
 
+# vectorized weights and original shape information 
 outw, outs = nn.get_vectorized_weights(net) 
 
+# run Pong 
 def fitness_pong(w, render: bool=False, steps=1000): 
     score = 0
 
@@ -36,6 +33,7 @@ def fitness_pong(w, render: bool=False, steps=1000):
         # env._max_episode_steps = steps
         obs = env.reset() 
 
+        # fitness 
         s = 0
 
         while True: 
@@ -47,6 +45,7 @@ def fitness_pong(w, render: bool=False, steps=1000):
 
             obs = obs / 256 
 
+            # determine action 
             res = net.predict(np.expand_dims(obs, 0))[0]
             action = np.argmax(res) 
 
@@ -70,6 +69,7 @@ def fitness_pong(w, render: bool=False, steps=1000):
     return score 
 
 if __name__ == "__main__": 
+    # init ES 
     e = es.EvolutionStrategy(
         outw, 
         1.0, 
@@ -80,7 +80,8 @@ if __name__ == "__main__":
         wait_iter=100000
     )
 
-    pool = mp.Pool(processes=12) 
+    # multiprocessing
+    pool = mp.Pool() 
 
     LENGTH = 1000
     times = 0 
@@ -91,8 +92,8 @@ if __name__ == "__main__":
             scores = [] 
             pop = e.ask() 
 
+            # eval population 
             for ind in pop: 
-                # scores.append(fitness_pong(ind, render=True, steps=LENGTH)) 
                 scores.append(pool.apply_async(fitness_pong, ((ind, False, LENGTH)))) 
 
             thread_scores = scores 
@@ -103,8 +104,6 @@ if __name__ == "__main__":
                 scores.append(s.get())
                 ii += 1 
                 print("{} / {}".format(ii, len(thread_scores)), end='\r')
-
-            # scores = [s.get() for s in scores] 
 
             e.tell(scores) 
 

@@ -1,3 +1,5 @@
+# Trains Pong using NEAT 
+
 import neat 
 
 import numpy as np 
@@ -9,14 +11,7 @@ import sys
 
 env = gym.make('Pong-ram-v4') 
 
-# print('Input:', env.reset().shape) 
-# print('Output:', env.action_space) 
-
-# for x in gym.envs.registry.all(): 
-#     print(x) 
-
-# sys.exit(0) 
-
+# run Pong 
 def fitness_pong(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
 
@@ -26,6 +21,7 @@ def fitness_pong(net: neat.Network, render: bool=False, steps=1000):
 
         net.clear() 
 
+        # fitness 
         s = 0
 
         while True: 
@@ -37,6 +33,7 @@ def fitness_pong(net: neat.Network, render: bool=False, steps=1000):
 
             obs = obs / 256 
 
+            # determine action 
             res = net.predict(obs)
             action = np.argmax(res) 
 
@@ -60,25 +57,7 @@ def fitness_pong(net: neat.Network, render: bool=False, steps=1000):
     return score
 
 if __name__ == "__main__": 
-    # neat_args = {
-    #     'n_pop': 100, 
-    #     'max_species': 30, 
-    #     'species_threshold': 1.0, 
-    #     'survive_threshold': 0.5, 
-    #     'clear_species': 100, 
-    #     'prob_add_node': 0.01, 
-    #     'prob_add_conn': 0.05, 
-    #     'prob_replace_weight': 0.01, 
-    #     'prob_mutate_weight': 0.2, 
-    #     'prob_toggle_conn': 0.01, 
-    #     'prob_replace_activation': 0.1, 
-    #     'std_new': 1.0, 
-    #     'std_mutate': 0.1, 
-    #     'activations': ['sigmoid'], 
-    #     'dist_weight': 0.5, 
-    #     'dist_activation': 1.0, 
-    #     'dist_disjoint': 1.0  
-    # }
+    # init NEAT
     neat_args = {
         'n_pop': 100, 
         'max_species': 30, 
@@ -101,6 +80,7 @@ if __name__ == "__main__":
 
     n = neat.Neat(128, 6, neat_args) 
 
+    # multiprocessing 
     pool = mp.Pool() 
 
     LENGTH = 1000
@@ -112,8 +92,8 @@ if __name__ == "__main__":
             scores = [] 
             pop = n.ask() 
 
+            # eval population
             for ind in pop: 
-                # scores.append(fitness_pong(ind, render=True, steps=LENGTH)) 
                 scores.append(pool.apply_async(fitness_pong, ((ind, False, LENGTH)))) 
 
             scores = [s.get() for s in scores] 

@@ -1,3 +1,5 @@
+# Trains the cart pole problem using NEAT 
+
 import neat 
 
 import numpy as np 
@@ -8,13 +10,7 @@ import sys
 
 env = gym.make('CartPole-v1') 
 
-# print('Input:', env.reset().shape) 
-# print('Output:', env.action_space) 
-# sys.exit(0) 
-
-# for x in gym.envs.registry.all(): 
-#     print(x) 
-
+# run cart pole problem
 def fitness_cartpole(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
     
@@ -23,6 +19,7 @@ def fitness_cartpole(net: neat.Network, render: bool=False, steps=1000):
         obs = env.reset() 
         net.clear() 
 
+        # total reward (fitness score) 
         s = 0
 
         while True: 
@@ -32,6 +29,7 @@ def fitness_cartpole(net: neat.Network, render: bool=False, steps=1000):
                 close = not env.render()
                 # print(obs) 
 
+            # determine action to take 
             res = net.predict(obs)
             action = np.argmax(res) 
 
@@ -51,6 +49,7 @@ def fitness_cartpole(net: neat.Network, render: bool=False, steps=1000):
     return score / 3
 
 if __name__ == "__main__": 
+    # init NEAT 
     neat_args = {
         'n_pop': 50, 
         'max_species': 30, 
@@ -83,6 +82,7 @@ if __name__ == "__main__":
             scores = [] 
             pop = n.ask() 
 
+            # eval population 
             for ind in pop: 
                 scores.append(fitness_cartpole(ind, steps=LENGTH)) 
                 # scores.append(pool.apply_async(fitness_xor, ((ind,)))) 
@@ -93,11 +93,11 @@ if __name__ == "__main__":
 
             max_score = np.max(scores)  
 
+            # show best individual 
             ind = pop[np.argmax(scores)] 
-            ind = pop[np.argmax(scores)] 
-            # print(ind) 
             fitness_cartpole(ind, render=True) 
 
+            # early stopping if solution is found 
             if max_score == LENGTH: 
                 times += 1 
             else: 

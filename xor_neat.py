@@ -1,9 +1,12 @@
+# Trains the XOR problem using NEAT 
+
 import neat 
 
 import numpy as np 
 
 import multiprocessing as mp 
 
+# test XOR inputs and outputs 
 def fitness_xor(net: neat.Network): 
     total, p = 0, 2
     total += np.power(0 - net.predict([0, 0]), p) 
@@ -14,6 +17,7 @@ def fitness_xor(net: neat.Network):
     return 4 - total 
 
 if __name__ == "__main__": 
+    # init NEAT 
     neat_args = {
         'n_pop': 500, 
         'max_species': 30, 
@@ -36,6 +40,7 @@ if __name__ == "__main__":
 
     n = neat.Neat(2, 1, neat_args) 
 
+    # multiprocessing 
     pool = mp.Pool() 
 
     try: 
@@ -43,8 +48,8 @@ if __name__ == "__main__":
             scores = [] 
             pop = n.ask() 
 
+            # eval population 
             for ind in pop: 
-                # scores.append(fitness_xor(ind)) 
                 scores.append(pool.apply_async(fitness_xor, ((ind,)))) 
 
             scores = [s.get() for s in scores] 

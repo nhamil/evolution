@@ -1,3 +1,5 @@
+# Trains the car racing problem using NEAT 
+
 import neat 
 import comm 
 
@@ -10,16 +12,9 @@ import sys
 
 env = gym.make('CarRacing-v0') 
 
-# print('Input:', env.reset().shape) 
-# print('Output:', env.action_space) 
+# plt.ion() 
 
-# for x in gym.envs.registry.all(): 
-#     print(x) 
-
-# sys.exit(0) 
-
-plt.ion() 
-
+# run the car racing problem 
 def fitness_car_race(net: neat.Network, render: bool=False, steps=1000): 
     score = 0
 
@@ -29,6 +24,7 @@ def fitness_car_race(net: neat.Network, render: bool=False, steps=1000):
 
         net.clear() 
 
+        # fitness 
         s = 0
 
         while True: 
@@ -45,6 +41,7 @@ def fitness_car_race(net: neat.Network, render: bool=False, steps=1000):
             #     plt.imshow(obs[::8,::8,1]) 
             #     plt.pause(0.00001) 
 
+            # determine action 
             res = net.predict(obs[::8,::8,1].flatten())
             res = res * 2 - 1 
             action = res #np.argmax(res) 
@@ -69,6 +66,7 @@ def fitness_car_race(net: neat.Network, render: bool=False, steps=1000):
     return score / 3
 
 if __name__ == "__main__": 
+    # init NEAT 
     neat_args = {
         'n_pop': 100, 
         'max_species': 30, 
@@ -104,8 +102,8 @@ if __name__ == "__main__":
             scores = [] 
             pop = n.ask() 
 
+            # eval population 
             for ind in pop: 
-                # scores.append(fitness_car_race(ind, render=False, steps=LENGTH)) 
                 scores.append(pool.apply_async(fitness_car_race, ((ind, False, LENGTH)))) 
 
             scores = [s.get() for s in scores] 
@@ -116,6 +114,7 @@ if __name__ == "__main__":
             if max_score > best: 
                 best = max_score 
 
+            # log score info 
             print("Writing...", end='') 
             hist.write("{}, {} \n".format(
                 max_score, 
@@ -125,30 +124,14 @@ if __name__ == "__main__":
 
             ind = pop[np.argmax(scores)] 
             
+            # save network info 
             f = open('models/car_{:03d}.neat'.format(i+1), 'wb') 
             out = comm.encode(ind.genome.export())
             f.write(out)
             f.close()  
             print("Done") 
 
-            # print("Reading") 
-            # f = open('models/car_{:03d}.neat'.format(i+1), 'rb') 
-            # in_data = f.read() 
-            # net = n.create_network(neat.Genome.load(comm.decode(in_data))) 
-
-            # print(ind) 
             fitness_car_race(ind, render=True) 
 
-            if max_score >= LENGTH: 
-                times += 1 
-            else: 
-                times = 0 
-
-            if times == 5: 
-                print(ind) 
-                break 
-
-    # except Exception as e: 
-    #     print("Error while training:", e) 
     finally: 
         pass 

@@ -17,6 +17,7 @@ This project uses Python 3 and has been tested on Ubuntu 18.04 and Windows 10 us
 ### Ubuntu 18.04 
 
 * Install the required packages: `sudo apt install xvfb libav-tools xorg-dev libsdl2-dev swig cmake` 
+  * There are potentially other dependencies but this *should* be all of them. If installation fails make sure to check the output. 
 * Install the project dependencies with `pip install -r requirements`. 
 
 ### Windows 10 
@@ -35,8 +36,8 @@ Now, you can install the project dependencies with `pip install -r requirements`
 
 The following files can be run to train an environment with the specified technique. These files can be run with `python <filename>`. Note that it may be difficult to stop the applications due to Python's multiprocessing, the easiest way to quit would probably be to close the terminal running the file. When a generation is finished, a simulation will display showing that generation's best individual interacting in the environment (this window may hide behind others, make sure to clear your main display). 
 
-| Algorithm | Environment | File | 
-| --------- | ----------- | ---- |
+| Algorithm | Environment                 | File                   | 
+| --------- | --------------------------- | ---------------------- |
 | NEAT      | `XOR                      ` | `xor_neat.py         ` | 
 | NEAT      | `CartPole-v1              ` | `cartpole_neat.py    ` | 
 | NEAT      | `LunarLanderContinuous-v2 ` | `lunarlander_neat.py ` | 
@@ -58,7 +59,7 @@ To train Pong with distributed computing, there are a few things you must do:
 
 1. Install this project on any machine that will be used. 
 2. Setup port forwarding to workers can connect to the host machine. The default port is 4919. 
-3. For each worker, run `python worker.py -t <num threads> -a <host address> -p <port>`. 
+3. For each worker, run `python worker.py -t <num threads> -a <server address> -p <port>`. 
 4. On the host system, run either distributed file (`pong_neat_distrib.py` or `pong_es_distrib.py`). 
 
 The output of the host should look something like this: 

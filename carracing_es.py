@@ -1,3 +1,5 @@
+# Trains the car racing problem using ES 
+
 import es 
 import nn
 import comm 
@@ -11,24 +13,19 @@ import sys
 
 env = gym.make('CarRacing-v0') 
 
-# print('Input:', env.reset().shape) 
-# print('Output:', env.action_space) 
+# plt.ion() 
 
-# for x in gym.envs.registry.all(): 
-#     print(x) 
-
-# sys.exit(0) 
-
-plt.ion() 
-
+# define network architecture 
 x = i = nn.Input((2*96//8*96//8*3//3,)) 
 x = nn.Dense(20)(x) 
 x = nn.Dense(3)(x) 
 net = nn.Model(i, x) 
 del x, i 
 
+# vectorized weights and original shape information 
 outw, outs = nn.get_vectorized_weights(net) 
 
+# run car racing problem 
 def fitness_car_race(w, render: bool=False, steps=1000): 
     score = 0
 
@@ -43,6 +40,7 @@ def fitness_car_race(w, render: bool=False, steps=1000):
 
         # net.clear() 
 
+        # fitness 
         s = 0
 
         while True: 
@@ -59,6 +57,7 @@ def fitness_car_race(w, render: bool=False, steps=1000):
             #     plt.imshow(obs[::8,::8,1]) 
             #     plt.pause(0.00001) 
 
+            # determine action 
             res = net.predict(np.expand_dims(np.concatenate([
                 last_obs[::8,::8,1].flatten(), 
                 obs[::8,::8,1].flatten()
@@ -87,6 +86,7 @@ def fitness_car_race(w, render: bool=False, steps=1000):
     return score / n
 
 if __name__ == "__main__": 
+    # init ES 
     e = es.EvolutionStrategy(
         outw, 
         1.0, 
@@ -97,6 +97,7 @@ if __name__ == "__main__":
         wait_iter=5
     )
 
+    # multiprocessing 
     pool = mp.Pool() 
 
     LENGTH = 1000
@@ -110,8 +111,8 @@ if __name__ == "__main__":
             scores = [] 
             pop = e.ask() 
 
+            # eval population 
             for ind in pop: 
-                # scores.append(fitness_car_race(ind, render=False, steps=LENGTH)) 
                 scores.append(pool.apply_async(fitness_car_race, ((ind, False, LENGTH)))) 
 
             thread_scores = scores 
@@ -123,14 +124,13 @@ if __name__ == "__main__":
                 ii += 1 
                 print("{} / {}".format(ii, len(thread_scores)), end='\r')
 
-            # scores = [s.get() for s in scores] 
-
             e.tell(scores) 
 
             max_score = np.max(scores)  
             if max_score > best: 
                 best = max_score 
 
+            # log score info 
             print("Writing...", end='') 
             hist.write("{}, {} \n".format(
                 max_score, 
@@ -140,30 +140,14 @@ if __name__ == "__main__":
 
             ind = pop[np.argmax(scores)] 
             
+            # save best individual 
             f = open('models/car_{:03d}.es'.format(i+1), 'wb') 
             out = comm.encode(ind)
             f.write(out)
             f.close()  
             print("Done") 
 
-            # print("Reading") 
-            # f = open('models/car_{:03d}.neat'.format(i+1), 'rb') 
-            # in_data = f.read() 
-            # net = n.create_network(neat.Genome.load(comm.decode(in_data))) 
-
-            # print(ind) 
             fitness_car_race(ind, render=True) 
 
-            if max_score >= LENGTH: 
-                times += 1 
-            else: 
-                times = 0 
-
-            if times == 5: 
-                print(ind) 
-                break 
-
-    # except Exception as e: 
-    #     print("Error while training:", e) 
     finally: 
         pass 

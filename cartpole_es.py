@@ -1,3 +1,5 @@
+# Trains the cart pole problem using ES 
+
 import es 
 import nn
 
@@ -9,20 +11,16 @@ import sys
 
 env = gym.make('CartPole-v1') 
 
-# print('Input:', env.reset().shape) 
-# print('Output:', env.action_space) 
-# sys.exit(0) 
-
-# for x in gym.envs.registry.all(): 
-#     print(x) 
-
+# define network architecture 
 x = i = nn.Input((4,)) 
 x = nn.Dense(2)(x) 
 net = nn.Model(i, x) 
 del x, i 
 
+# vectorized weights and original shape information 
 outw, outs = nn.get_vectorized_weights(net) 
 
+# run cart pole problem
 def fitness_cartpole(w: np.ndarray, render: bool=False, steps=1000): 
     score = 0
 
@@ -36,6 +34,7 @@ def fitness_cartpole(w: np.ndarray, render: bool=False, steps=1000):
         env._max_episode_steps = steps
         obs = env.reset() 
 
+        # total reward (fitness score) 
         s = 0
 
         while True: 
@@ -45,6 +44,7 @@ def fitness_cartpole(w: np.ndarray, render: bool=False, steps=1000):
                 close = not env.render()
                 # print(obs) 
 
+            # determine action to take 
             res = net.predict(np.expand_dims(obs, 0))[0]
             action = np.argmax(res) 
 
@@ -64,6 +64,7 @@ def fitness_cartpole(w: np.ndarray, render: bool=False, steps=1000):
     return score / n
 
 if __name__ == "__main__": 
+    # init ES 
     e = es.EvolutionStrategy(
         outw, 
         0.1, 
@@ -74,6 +75,7 @@ if __name__ == "__main__":
         wait_iter=5
     )
 
+    # multiprocessing 
     pool = mp.Pool() 
 
     LENGTH = 10000
@@ -84,8 +86,8 @@ if __name__ == "__main__":
             scores = [] 
             pop = e.ask() 
 
+            # eval population 
             for ind in pop: 
-                # scores.append(fitness_cartpole(ind, steps=LENGTH)) 
                 scores.append(pool.apply_async(fitness_cartpole, ((ind, False, LENGTH)))) 
 
             thread_scores = scores 
@@ -97,16 +99,15 @@ if __name__ == "__main__":
                 ii += 1 
                 print("{} / {}".format(ii, len(thread_scores)), end='\r')
 
-            # scores = [s.get() for s in scores] 
-
             e.tell(scores) 
 
             max_score = np.max(scores)  
 
+            # show best individual 
             ind = pop[np.argmax(scores)] 
-            # print(ind) 
             fitness_cartpole(ind, render=True) 
 
+            # early stopping if solution is found 
             if max_score == LENGTH: 
                 times += 1 
             else: 
@@ -119,5 +120,3 @@ if __name__ == "__main__":
 
     finally: 
         pass 
-    # except Exception as e: 
-    #     print("Error while training:", e) 
