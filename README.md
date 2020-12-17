@@ -58,7 +58,7 @@ The following files can be run to train an environment with the specified techni
 To train Pong with distributed computing, there are a few things you must do: 
 
 1. Install this project on any machine that will be used. 
-2. Setup port forwarding to workers can connect to the host machine. The default port is 4919. 
+2. Setup port forwarding so workers can connect to the host machine. The default port is 4919. 
 3. For each worker, run `python worker.py -t <num threads> -a <server address> -p <port>`. 
 4. On the host system, run either distributed file (`pong_neat_distrib.py` or `pong_es_distrib.py`). 
 
