@@ -18,7 +18,7 @@ This project uses Python 3 and has been tested on Ubuntu 18.04 and Windows 10 us
 
 * Install the required packages: `sudo apt install libsdl2-dev swig cmake python3-tk` 
   * There are potentially other dependencies but this *should* be all of them. If installation fails make sure to check the output. 
-* Install the project dependencies with `pip install -r requirements`. 
+* Install the project dependencies with `pip install -r requirements.txt`. 
 
 ### Windows 10 
 
@@ -30,7 +30,7 @@ It is more complicated to get the project to work on Windows. This is due to the
 
 Additionally, `ale_c.dll` is required to run any Atari environments. It has been included in the `res` folder. This file should be copied to `<python folder>/Lib/site-packages/atari_py/ale_interface/`. 
 
-Now, you can install the project dependencies with `pip install -r requirements`. 
+Now, you can install the project dependencies with `pip install -r requirements.txt`. 
 
 ## Usage 
 
