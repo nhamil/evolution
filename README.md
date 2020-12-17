@@ -16,7 +16,8 @@ This project uses Python 3 and has been tested on Ubuntu 18.04 and Windows 10 us
 
 ### Ubuntu 18.04 
 
-**TODO**
+* Install the required packages: `sudo apt install xvfb libav-tools xorg-dev libsdl2-dev swig cmake` 
+* Install the project dependencies with `pip install -r requirements`. 
 
 ### Windows 10 
 
@@ -81,9 +82,9 @@ Starting worker process with 12 thread(s)
 Connecting to 12.34.56.77:4919
 Connected!
 New shared data from server
-Task from server: pong_es (id=1)
-Task from server: pong_es (id=4)
-Task from server: pong_es (id=7)
+Task from server: pong_<alg> (id=1)
+Task from server: pong_<alg> (id=4)
+Task from server: pong_<alg> (id=7)
 .
 .
 .
