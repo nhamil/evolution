@@ -16,7 +16,7 @@ This project uses Python 3 and has been tested on Ubuntu 18.04 and Windows 10 us
 
 ### Ubuntu 18.04 
 
-* Install the required packages: `sudo apt install xvfb libav-tools xorg-dev libsdl2-dev swig cmake` 
+* Install the required packages: `sudo apt install libsdl2-dev swig cmake python3-tk` 
   * There are potentially other dependencies but this *should* be all of them. If installation fails make sure to check the output. 
 * Install the project dependencies with `pip install -r requirements`. 
 
